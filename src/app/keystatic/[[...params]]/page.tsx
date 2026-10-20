@@ -1,4 +1,5 @@
-// Rendered by the layout; this file only claims the /keystatic/* routes.
+import KeystaticApp from "../keystatic";
+
 export default function Page() {
-  return null;
+  return <KeystaticApp />;
 }
