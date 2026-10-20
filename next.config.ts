@@ -2,13 +2,11 @@ import type { NextConfig } from "next";
 import { redirects } from "./src/content/redirects";
 
 const nextConfig: NextConfig = {
+  // Keystatic's local GitHub setup redirects to 127.0.0.1; let the dev server serve it.
+  allowedDevOrigins: ["127.0.0.1"],
   cacheComponents: true,
-  images: {
-    // Media library uploads are served from the Supabase Storage public bucket.
-    remotePatterns: [
-      { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
-    ],
-  },
+  // Keystatic content is read from disk at runtime by server functions on Vercel.
+  outputFileTracingIncludes: { "/**": ["./content/**/*"] },
   partialPrefetching: true,
   turbopack: {
     rules: {

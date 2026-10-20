@@ -3,6 +3,7 @@ import type { ReactNode, SVGProps } from "react";
 export type UiIconName =
   | "arrow-right"
   | "arrow-down"
+  | "chevron-down"
   | "menu"
   | "close"
   | "play"
@@ -19,6 +20,7 @@ export type UiIconName =
 const PATHS: Record<UiIconName, ReactNode> = {
   "arrow-right": <path d="M4 12h15M13 6l6 6-6 6" />,
   "arrow-down": <path d="M12 4v15M6 13l6 6 6-6" />,
+  "chevron-down": <path d="m6 9 6 6 6-6" />,
   menu: <path d="M4 9h16M4 15h16" />,
   play: <path d="M8 5.5v13l10-6.5-10-6.5Z" />,
   pause: <path d="M8.5 5v14M15.5 5v14" />,

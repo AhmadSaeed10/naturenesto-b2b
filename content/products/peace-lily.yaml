@@ -1,0 +1,13 @@
+title: Peace Lily
+price: 1900
+size: Medium, 60 cm
+categories:
+  - indoor-plants
+  - low-light
+badges: []
+inStock: true
+sample: true
+images:
+  - src: /images/products/peace-lily/peace-lily.webp
+    alt: ""
+description: ""

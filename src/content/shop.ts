@@ -4,7 +4,7 @@ export const shop = {
   eyebrow: "Shop",
   productCount: (n: number): string => `${n} ${n === 1 ? "product" : "products"}`,
   sampleNotice:
-    "Showing sample products. Live inventory will appear here once the catalogue is connected.",
+    "Showing sample products. Real products will appear here once they are added in the CMS.",
   enquire: "Enquire",
   outOfStock: "Out of stock",
   browse: "Browse categories",

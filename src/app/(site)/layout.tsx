@@ -9,8 +9,7 @@ import { ui } from "@/content/ui";
 import { MAIN_CONTENT_ID } from "@/lib/constants";
 import { getSiteChrome } from "@/lib/cms/data";
 
-// Storefront chrome, read from site settings and navigation menus (src/content fallback).
-// The admin route group has its own calmer shell.
+// Storefront chrome, read from the Keystatic settings and navigation (src/content fallback).
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const chrome = await getSiteChrome();
   return (
@@ -23,7 +22,12 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           focusTargetId={HEADER_HOME_LINK_ID}
         />
       ) : null}
-      <Header nav={chrome.headerNav} cta={chrome.headerCta} socials={chrome.socials} />
+      <Header
+        shop={chrome.shopMenu}
+        nav={chrome.headerNav}
+        cta={chrome.headerCta}
+        socials={chrome.socials}
+      />
       <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
         {children}
       </main>

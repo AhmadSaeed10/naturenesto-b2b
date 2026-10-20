@@ -1,0 +1,13 @@
+title: Glazed Ceramic Bowl
+price: 2400
+size: 30 cm
+categories:
+  - pots-and-planters
+badges:
+  - bestseller
+inStock: true
+sample: true
+images:
+  - src: /images/products/ceramic-bowl/pot-ceramic.webp
+    alt: ""
+description: ""

@@ -1,0 +1,16 @@
+title: Spider Plant
+price: 950
+size: Small, 30 cm
+categories:
+  - indoor-plants
+  - pet-friendly
+  - easy-care
+badges:
+  - pet-safe
+  - easy-care
+inStock: true
+sample: true
+images:
+  - src: /images/products/spider-plant/spider.webp
+    alt: ""
+description: ""

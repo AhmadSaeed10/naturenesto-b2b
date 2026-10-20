@@ -3,24 +3,12 @@ import { categories, categoriesTitle } from "@/content/categories";
 import { banner, hero, needHelp, taglineStrip, valueProps } from "@/content/home";
 import { services, servicesEyebrow } from "@/content/services";
 import { howItWorks, steps } from "@/content/steps";
+import { ICON_NAMES } from "@/content/types";
 
 // Typed JSON blocks for page_sections.data. Only the fields the components render are
 // kept; review flags stay in src/content, which remains their source of truth.
 
-const ICONS = [
-  "plant",
-  "vase",
-  "table",
-  "guidance",
-  "community",
-  "support",
-  "floorplan",
-  "leaf",
-  "poster",
-  "gift",
-  "pot",
-  "building",
-] as const;
+const ICONS = ICON_NAMES;
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 const optionalText = (max: number) => z.string().trim().max(max);

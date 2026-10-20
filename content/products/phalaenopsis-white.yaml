@@ -1,0 +1,16 @@
+title: White Phalaenopsis Orchid
+price: 4200
+size: Double stem
+categories:
+  - orchids
+  - pet-friendly
+  - indoor-plants
+badges:
+  - pet-safe
+  - bestseller
+inStock: true
+sample: true
+images:
+  - src: /images/products/phalaenopsis-white/orchid.webp
+    alt: ""
+description: ""

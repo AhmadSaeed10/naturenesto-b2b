@@ -1,0 +1,13 @@
+title: Rubber Plant
+price: 3800
+size: Medium, 80 cm
+categories:
+  - indoor-plants
+  - large-plants
+badges: []
+inStock: false
+sample: true
+images:
+  - src: /images/products/rubber-plant/monstera.webp
+    alt: ""
+description: ""

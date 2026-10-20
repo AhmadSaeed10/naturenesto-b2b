@@ -1,0 +1,14 @@
+title: Olive Tree
+price: 9500
+size: Large, 140 cm
+categories:
+  - outdoor-plants
+  - large-plants
+badges:
+  - new
+inStock: true
+sample: true
+images:
+  - src: /images/products/olive-tree/olive.webp
+    alt: ""
+description: ""

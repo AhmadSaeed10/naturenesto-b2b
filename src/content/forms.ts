@@ -42,6 +42,26 @@ export const forms = {
     whatsapp: "Chat on WhatsApp",
     flag: "Temporary until a delivery method is chosen.",
   },
+  sent: {
+    title: "Thank you",
+    body: "We have your message and will get back to you shortly.",
+  },
+  // Email to the store inbox. Labels name each field in plain text.
+  email: {
+    subject: {
+      contact: (name: string) => `Website message from ${name}`,
+      consultation: (name: string) => `Consultation request from ${name}`,
+    },
+    labels: {
+      name: "Name",
+      email: "Email",
+      phone: "Phone",
+      message: "Message",
+      spaceType: "Type of space",
+      service: "Service",
+      details: "About the space",
+    },
+  },
   pages: {
     contactEyebrow: "Get in touch",
     consultationEyebrow: "Start with your space",

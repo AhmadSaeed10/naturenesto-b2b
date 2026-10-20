@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { stubPages } from "@/content/pages";
-import { listProductHandles } from "@/lib/commerce/products";
+import { listProductHandles } from "@/lib/catalog";
 import { siteUrl } from "@/lib/seo";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

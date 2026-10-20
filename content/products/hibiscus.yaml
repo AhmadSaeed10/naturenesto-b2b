@@ -1,0 +1,12 @@
+title: Hibiscus
+price: 1300
+size: Medium, 60 cm
+categories:
+  - outdoor-plants
+badges: []
+inStock: true
+sample: true
+images:
+  - src: /images/products/hibiscus/flowering.webp
+    alt: ""
+description: ""

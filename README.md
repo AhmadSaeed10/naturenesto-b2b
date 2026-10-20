@@ -81,15 +81,16 @@ Notes:
 
 ## Content editing
 
-All copy and link data lives in typed files under `src/content`. Components never hardcode copy.
+Content, products and settings live in `content/` and are edited in Keystatic at `/keystatic` (a Git CMS: every save is a commit and Vercel redeploys). The typed files in `src/content` hold the shipped copy and act as the fallback for every field.
 
 - Source of truth for homepage copy: `docs/homepage-copy.md`. Copy is verbatim and is never rewritten.
 - Any `flag` field marks an open item for client confirmation. List them with `grep -rn "flag:" src/content`.
-- Old live URLs are redirected (308) to clean slugs via `src/content/redirects.ts`.
+- Old live URLs are redirected (308) to clean slugs via `src/content/redirects.ts`; more can be added in Keystatic.
+- Setup, editing guide, orders and bulk quotes: `docs/CMS.md`.
 
-## Product catalogue
+## Shop
 
-Category pages list products from Supabase when `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set, and fall back to the sample catalogue in `src/content/sample-products.ts` otherwise (or when a category has no live rows). A note on the page says when samples are showing. Setup and schema: `docs/SUPABASE.md`.
+Products are Keystatic entries (`content/products`). The cart lives in the browser; checkout re-prices on the server and sends the order by email (Resend) with a WhatsApp handoff. Every product page has "Request bulk pricing" for business orders. See `docs/CMS.md`.
 
 ## Project structure
 
@@ -98,8 +99,10 @@ src/
   app/          routes, layouts, metadata
   components/   layout, sections, ui, motion
   content/      typed copy and link data
-  lib/          tokens, fonts and shared utilities
+  lib/          tokens, fonts, catalogue, cart, order pricing, email, CMS reads
   styles/       generated token CSS
+content/        Keystatic content (YAML), edited at /keystatic
+keystatic.config.ts  CMS schema
 scripts/        token build and contrast check
-docs/           copy source and phase prompts
+docs/           copy source, CMS guide and phase prompts
 ```

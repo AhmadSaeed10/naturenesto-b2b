@@ -1,0 +1,47 @@
+header:
+  - label: Services
+    href: /services
+  - label: About Us
+    href: /about
+  - label: Contact
+    href: /contact
+headerCta:
+  label: Book a Consultation
+  href: /consultation
+footer:
+  - heading: SERVICES
+    links:
+      - label: Space Planning & Decor Consultation
+        href: /services/space-planning
+      - label: Indoor & Outdoor Plants Styling
+        href: /services/plant-styling
+      - label: Custom Poster & Quote Design
+        href: /services/custom-posters
+      - label: Personalized Gift Bundles
+        href: /services/gift-bundles
+      - label: Pot & Decor Customization
+        href: /services/pot-customization
+      - label: Corporate & Commercial Styling
+        href: /services/corporate-styling
+  - heading: CUSTOMER SERVICES
+    links:
+      - label: FAQ
+        href: /faq
+      - label: Shipping & Handling
+        href: /shipping
+      - label: Contact Us
+        href: /contact
+  - heading: Explore
+    links:
+      - label: Our Story
+        href: /our-story
+      - label: Career
+        href: /careers
+      - label: Workshops
+        href: /workshops
+      - label: Blogs
+        href: /blogs
+      - label: About Us
+        href: /about
+      - label: Work Place Policy
+        href: /workplace-policy

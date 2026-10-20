@@ -7,15 +7,13 @@ import { Reveal } from "@/components/motion/Reveal";
 import { ProductPurchase } from "@/components/shop/ProductPurchase";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { commerce } from "@/content/commerce";
-import { needHelp } from "@/content/home";
 import { shop } from "@/content/shop";
 import { site } from "@/content/site";
+import { getProduct, listProductHandles } from "@/lib/catalog";
+import { getSiteChrome } from "@/lib/cms/data";
 import { richTextPlain } from "@/lib/cms/rich-text";
-import { getProduct, listProductHandles } from "@/lib/commerce/products";
-import { PAISA_PER_RUPEE } from "@/lib/money";
 import { pageMetadata, siteUrl } from "@/lib/seo";
 
-const whatsappHref = needHelp.channels.find((channel) => channel.kind === "whatsapp")?.href ?? "";
 // Cache Components needs one param at build; the placeholder renders a 404.
 const PLACEHOLDER = "no-products-yet";
 
@@ -30,35 +28,34 @@ export async function generateMetadata({
   const product = await getProduct((await params).handle);
   if (!product) return {};
   return pageMetadata({
-    title: product.seoTitle || product.title,
-    description: product.seoDescription || richTextPlain(product.description) || product.title,
+    title: product.seoTitle || product.name,
+    description: product.seoDescription || richTextPlain(product.description) || product.name,
     path: `/products/${product.handle}`,
   });
 }
 
 export default async function ProductPage({ params }: PageProps<"/products/[handle]">) {
-  const product = await getProduct((await params).handle);
+  const [product, chrome] = await Promise.all([getProduct((await params).handle), getSiteChrome()]);
   if (!product) notFound();
 
   const base = siteUrl();
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: product.title,
+    name: product.name,
     description: richTextPlain(product.description, 500) || undefined,
     image: product.images.map((image) => new URL(image.src, base).toString()),
-    sku: product.variants[0]?.sku ?? undefined,
-    brand: { "@type": "Brand", name: product.vendor || site.name },
-    offers: product.variants.map((variant) => ({
+    sku: product.handle,
+    brand: { "@type": "Brand", name: site.name },
+    offers: {
       "@type": "Offer",
-      price: (variant.price / PAISA_PER_RUPEE).toFixed(2),
+      price: product.price.toFixed(2),
       priceCurrency: "PKR",
-      availability: variant.available
+      availability: product.inStock
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
       url: `${base}/products/${product.handle}`,
-      sku: variant.sku ?? undefined,
-    })),
+    },
   };
   const [hero, ...rest] = product.images;
 
@@ -110,14 +107,15 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
         </div>
         <Reveal className="flex flex-col gap-8 lg:sticky lg:top-28 lg:self-start">
           <div className="flex flex-col gap-4">
-            {product.productType ? (
-              <Eyebrow>{product.productType}</Eyebrow>
-            ) : (
-              <Eyebrow>{shop.eyebrow}</Eyebrow>
-            )}
-            <h1 className="text-h2">{product.title}</h1>
+            <Eyebrow>{shop.eyebrow}</Eyebrow>
+            <h1 className="text-h2">{product.name}</h1>
+            {product.sample ? (
+              <p role="note" className="text-small text-ink-muted">
+                {shop.sampleNotice}
+              </p>
+            ) : null}
           </div>
-          <ProductPurchase product={product} whatsappHref={whatsappHref} />
+          <ProductPurchase product={product} whatsappHref={chrome.whatsappHref} />
           {product.description ? (
             <div className="flex flex-col gap-3 border-t border-line pt-6">
               <h2 className="eyebrow text-ink-muted">{commerce.product.details}</h2>

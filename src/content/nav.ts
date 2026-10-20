@@ -4,11 +4,13 @@ import type { Cta, FooterColumn, NavLink } from "./types";
 
 const INFERRED = "Inferred from an earlier fetch, not from the pasted copy.";
 
+// Header shop menu: lists every catalogue category (built in src/lib/cms/data.ts).
+export const shopMenu = { label: "Shop" };
+
+// Links after the Shop menu. Pots & Planters, Indoor and Outdoor Plants moved into it.
 export const headerNav: NavLink[] = [
-  { label: "Pots & Planters", href: "/pots-and-planters", flag: INFERRED },
-  { label: "Indoor Plants", href: "/indoor-plants", flag: INFERRED },
-  { label: "Outdoor Plants", href: "/outdoor-plants", flag: INFERRED },
   { label: "Services", href: "/services" },
+  { label: "About Us", href: "/about", flag: INFERRED },
   { label: "Contact", href: "/contact", flag: INFERRED },
 ];
 

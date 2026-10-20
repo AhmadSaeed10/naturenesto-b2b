@@ -1,0 +1,14 @@
+title: Monstera Deliciosa
+price: 4500
+size: Medium, 90 cm
+categories:
+  - indoor-plants
+  - large-plants
+badges:
+  - bestseller
+inStock: true
+sample: true
+images:
+  - src: /images/products/monstera/monstera.webp
+    alt: ""
+description: ""

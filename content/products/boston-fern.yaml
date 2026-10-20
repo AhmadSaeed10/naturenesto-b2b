@@ -1,0 +1,14 @@
+title: Boston Fern
+price: 1400
+size: Hanging, 40 cm
+categories:
+  - indoor-plants
+  - pet-friendly
+badges:
+  - pet-safe
+inStock: true
+sample: true
+images:
+  - src: /images/products/boston-fern/fern.webp
+    alt: ""
+description: ""

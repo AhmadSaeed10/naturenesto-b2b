@@ -1,0 +1,176 @@
+hero:
+  show: true
+  headline: Bring Life to Your Space
+  subline: Welcome to Nature Nesto
+  secondary: Transform Your Space with Us
+  cta:
+    label: Shop Now
+    href: /pots-and-planters
+  poster:
+    src: /images/hero-poster.webp
+  video:
+    src: https://videos.pexels.com/video-files/3770017/3770017-hd_1920_1080_25fps.mp4
+tagline:
+  show: true
+  items:
+    - text: One Plant
+      icon: plant
+    - text: One Piece
+      icon: vase
+    - text: One Vibe at a time.
+      icon: table
+value_props:
+  show: true
+  items:
+    - title: Expert Guidance
+      body: Success starts with choosing the right plants. We'll make sure you do.
+      icon: guidance
+    - title: Connect & Grow
+      body: Community is everything. Our workshops and events help you learn and connect.
+      icon: community
+    - title: Judgement-Free Service
+      body: Our dedicated team is always available to assist — no question too small or too silly!
+      icon: support
+how_it_works:
+  show: true
+  eyebrow: HOW NATURE NESTO WORKS
+  title: How Nature Nesto Works
+  steps:
+    - number: "01"
+      title: Share Your Space
+      body: Whether it’s your home, office, café, or any other area — share a few details and images with us. Let us know your space dimensions, vibe, lighting, and any inspirations or mood boards you love.
+    - number: "02"
+      title: Get a Personalized Plan
+      body: Our team of plant stylists and designers will curate a tailored concept just for you — including recommended indoor/outdoor plants, decorative pieces, custom artwork or posters, and layout ideas to bring it all together.
+    - number: "03"
+      title: Choose What You Love
+      body: From the curated plan, select the items and services you love most — plants, pots, artwork, or full styling. Need something custom? No worries, we’ve got you covered.
+    - number: "04"
+      title: We Deliver & Style It
+      body: Once you confirm, we prepare everything with care and deliver it to your doorstep. If you opt for our styling services, we’ll help set everything up — from plant placement to art installation.
+    - number: "05"
+      title: Ongoing Plant Care
+      body: For businesses and busy clients, we also offer ongoing plant maintenance services to keep everything fresh, vibrant, and healthy all year round.
+services:
+  show: true
+  eyebrow: NATURE NESTO SERVICES
+  services:
+    - featured: true
+      slug: space-planning
+      icon: floorplan
+      title: Space Planning & Decor Consultation
+      href: /services/space-planning
+      legacyPath: /premium-outdoor-plants-services-space-planning-and-decor-consultation
+    - featured: false
+      slug: plant-styling
+      icon: leaf
+      title: Indoor & Outdoor Plants Styling
+      href: /services/plant-styling
+      legacyPath: /premium-indoor-plants-services-indoor-and-outdoor-plants-styling
+    - featured: false
+      slug: custom-posters
+      icon: poster
+      title: Custom Poster & Quote Design
+      href: /services/custom-posters
+      legacyPath: /services-custom-poster-and-quote-design
+    - featured: false
+      slug: gift-bundles
+      icon: gift
+      title: Personalized Gift Bundles
+      href: /services/gift-bundles
+      legacyPath: /services-personalized-gift-bundles
+    - featured: false
+      slug: pot-customization
+      icon: pot
+      title: Pot & Decor Customization
+      href: /services/pot-customization
+      legacyPath: /services-pot-and-decor-customization
+    - featured: false
+      slug: corporate-styling
+      icon: building
+      title: Corporate & Commercial Styling
+      href: /services/corporate-styling
+      legacyPath: /premium-plants-services-corporate-and-commercial-styling
+banner:
+  show: true
+  headline: Predict the future by creating it
+  secondary: Transform Your Space with Us
+  cta:
+    label: Shop Now
+    href: /pots-and-planters
+  image:
+    src: /images/banner.webp
+    alt: ""
+plants:
+  show: true
+  title: Plants For Everyone
+  categories:
+    - slug: indoor-plants
+      title: Indoor Plants
+      href: /indoor-plants
+      image:
+        src: /images/categories/indoor-plants.webp
+        alt: ""
+    - slug: outdoor-plants
+      title: Outdoor Plants
+      href: /outdoor-plants
+      image:
+        src: /images/categories/outdoor-plants.webp
+        alt: ""
+    - slug: pet-friendly
+      title: Pet Friendly Plants
+      href: /plants/pet-friendly
+      image:
+        src: /images/categories/pet-friendly.webp
+        alt: ""
+    - slug: easy-care
+      title: Easy Care Plants
+      href: /plants/easy-care
+      image:
+        src: /images/categories/easy-care.webp
+        alt: ""
+    - slug: orchids
+      title: Orchids
+      href: /plants/orchids
+      image:
+        src: /images/categories/orchids.webp
+        alt: ""
+    - slug: large-plants
+      title: Large Plants
+      href: /plants/large-plants
+      image:
+        src: /images/categories/large-plants.webp
+        alt: ""
+    - slug: low-light
+      title: Low Light Tolerate Plants
+      href: /plants/low-light
+      image:
+        src: /images/categories/low-light.webp
+        alt: ""
+    - slug: plant-care
+      title: Plants Care
+      href: /plants/plant-care
+      image:
+        src: /images/categories/plant-care.webp
+        alt: ""
+need_help:
+  show: true
+  title: Need Help?
+  body: Your confidence is our priority. Unsure what plants will work with your light? New to gardening outdoors and need some advice? Reach out, we're here to help.
+  signOff: SPEAK TO TEAM NATURE NESTO
+  channels:
+    - kind: whatsapp
+      label: Chat/ WhatsApp
+      prompt: DM to expert
+      display: +92 318 0427 602
+      href: https://wa.me/923180427602
+    - kind: call
+      label: Call
+      prompt: Speak to expert
+      display: +92 322 4024 862
+      href: tel:+923224024862
+    - kind: email
+      label: Email
+      prompt: Send a note to
+      display: info@naturenesto.com
+      href: mailto:info@naturenesto.com

@@ -24,13 +24,14 @@ The live site is not reachable from the build environment. All homepage copy, li
 ## Stack
 - Next.js 16 (App Router), React 19, TypeScript strict (no `any`, no non-null assertions without a comment)
 - Tailwind CSS v4, theme generated from `src/lib/tokens.ts`
+- Keystatic (`@keystatic/core`, `@keystatic/next`) as the Git based CMS
 - Motion (`motion/react`) for animation. Lenis dropped in Phase 3: native scroll keeps keyboard and assistive tech behaviour intact
 - next/font, next/image, next/link everywhere
 - ESLint, Prettier, absolute imports via `@/`
 - Deploy: GitHub + Vercel
 
-## Backend (Supabase)
-Project ref: uqxzuzejnyacrshssdpz (NatureNesto-Mumbai, ap-south-1). Secrets only in .env.local, Vercel env and GitHub Actions secrets, never in code, logs or commits. Service role key is server only. All schema changes are migrations in supabase/migrations. The database is the source of truth for products, orders, customers, media and CMS content. Admin lives at /admin (noindex, role gated). Follow docs/ADMIN.md.
+## Backend (no database)
+This repo is the B2B first duplicate of NatureNesto. There is no Supabase or other database. Content, products and settings are YAML files in `content/`, edited with Keystatic at `/keystatic` (GitHub storage in production: every save is a commit, Vercel redeploys). Schema: `keystatic.config.ts`. Reads go through `src/lib/cms` and `src/lib/catalog.ts`, validated, with `src/content` as the fallback. The cart is browser storage; orders, bulk quotes and enquiries are emailed via Resend (HTTP API, server only) with a WhatsApp handoff. Secrets only in .env.local and Vercel env, never in code, logs or commits. Follow docs/CMS.md.
 
 ## Commands
 - `npm run dev` start dev server
@@ -47,11 +48,13 @@ src/
     sections/          one file per homepage section
     ui/                Button, Card, Tile, Eyebrow, Icon
     motion/            Reveal, SplitHeading, Stagger, ParallaxImage, Magnetic
-  content/             typed data: site.ts, nav.ts, services.ts, categories.ts, steps.ts
-  lib/                 tokens.ts, motion.ts, fonts.ts, seo.ts, utils.ts
+  content/             typed data and fallbacks: site.ts, nav.ts, services.ts, categories.ts, steps.ts
+  lib/                 tokens.ts, motion.ts, fonts.ts, seo.ts, utils.ts, catalog.ts, cart.ts, order.ts, email.ts, cms/
+content/               Keystatic YAML (products, settings, navigation, homepage, pages, posts)
+keystatic.config.ts    CMS schema
 public/                static assets, optimized images
 ```
-All copy and link data lives in `src/content`. Components receive typed props. No hardcoded copy in JSX.
+All copy and link data lives in `src/content` (shipped copy and fallbacks) or `content/` (CMS editable). Components receive typed props. No hardcoded copy in JSX.
 
 ## Brand tokens (single source of truth: `src/lib/tokens.ts`)
 Values below are estimates read from the logo. Confirm with an eyedropper on the original SVG, then update this file and tokens.ts together.
@@ -123,7 +126,7 @@ Rules:
 
 ## Homepage sections (preserve order and copy)
 1. Announcement bar: "Transform your space with exclusive discounts!" (dismissible)
-2. Header: logo, nav (Pots & Planters, Indoor Plants, Outdoor Plants, Contact), plus new Services link and "Book a Consultation" button
+2. Header: logo, "Shop" dropdown listing every category (Pots & Planters, Indoor Plants, Outdoor Plants and the Plants For Everyone collections), Services, About Us, Contact, "Book a Consultation" button, cart
 3. Hero: video background (Pexels source kept), "Bring Life to Your Space", "Welcome to Nature Nesto", Shop Now
 4. Tagline strip: One Plant / One Piece / One Vibe at a time, with icons
 5. Value props: Expert Guidance, Connect & Grow, Judgement-Free Service

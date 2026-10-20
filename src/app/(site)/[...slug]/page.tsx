@@ -22,6 +22,7 @@ const DEDICATED = new Set([
   "/blogs",
   "/workshops",
   "/faq",
+  "/about",
   ...services.map((service) => service.href),
   ...catalogCategories.map((category) => category.href),
 ]);
@@ -32,7 +33,7 @@ export function generateStaticParams() {
     .map((page) => ({ slug: page.path.slice(1).split("/") }));
 }
 
-// A published CMS page with this handle (one segment) replaces the placeholder.
+// A CMS page with this handle (one segment) and a body replaces the placeholder.
 const cmsHandle = (slug: string[]): string | null =>
   slug.length === 1 && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug[0] ?? "") ? (slug[0] ?? null) : null;
 
@@ -40,7 +41,7 @@ export async function generateMetadata({ params }: PageProps<"/[...slug]">): Pro
   const { slug } = await params;
   const handle = cmsHandle(slug);
   const cmsPage = handle ? await getPublishedPage(handle) : null;
-  if (cmsPage) {
+  if (cmsPage?.body.trim()) {
     return pageMetadata({
       title: cmsPage.seoTitle || cmsPage.title,
       description:
@@ -62,7 +63,15 @@ export default async function Page({ params }: PageProps<"/[...slug]">) {
   const { slug } = await params;
   const handle = cmsHandle(slug);
   const cmsPage = handle ? await getPublishedPage(handle) : null;
-  if (cmsPage) return <CmsArticle title={cmsPage.title} body={cmsPage.body} />;
+  if (cmsPage?.body.trim()) {
+    return (
+      <CmsArticle
+        eyebrow={cmsPage.eyebrow ?? undefined}
+        title={cmsPage.title}
+        body={cmsPage.body}
+      />
+    );
+  }
 
   const page = findPage(slug);
   if (page) return <StubPage title={page.title} body={page.todo} />;

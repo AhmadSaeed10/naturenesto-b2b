@@ -1,0 +1,15 @@
+title: Calathea Orbifolia
+price: 3200
+size: Medium, 55 cm
+categories:
+  - indoor-plants
+  - pet-friendly
+  - low-light
+badges:
+  - pet-safe
+inStock: true
+sample: true
+images:
+  - src: /images/products/calathea/calathea.webp
+    alt: ""
+description: ""

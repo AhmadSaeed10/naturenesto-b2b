@@ -1,0 +1,14 @@
+title: Blush Phalaenopsis Orchid
+price: 4200
+size: Double stem
+categories:
+  - orchids
+  - pet-friendly
+badges:
+  - pet-safe
+inStock: true
+sample: true
+images:
+  - src: /images/products/phalaenopsis-blush/orchid-2.webp
+    alt: ""
+description: ""

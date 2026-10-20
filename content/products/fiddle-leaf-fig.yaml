@@ -1,0 +1,14 @@
+title: Fiddle Leaf Fig
+price: 8500
+size: Large, 150 cm
+categories:
+  - indoor-plants
+  - large-plants
+badges:
+  - new
+inStock: true
+sample: true
+images:
+  - src: /images/products/fiddle-leaf-fig/fiddle.webp
+    alt: ""
+description: ""
