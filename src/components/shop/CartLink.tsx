@@ -1,23 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { commerce } from "@/content/commerce";
+import { cartCount, useCart } from "@/lib/cart";
 
-/** Fired by add to cart and quantity changes so the header count updates without a reload. */
-export const CART_EVENT = "nn:cart";
-
-export function CartLink({ initialCount }: { initialCount: number }) {
-  const [count, setCount] = useState(initialCount);
-
-  useEffect(() => {
-    const onChange = (event: Event) => {
-      if (event instanceof CustomEvent && typeof event.detail === "number") setCount(event.detail);
-    };
-    window.addEventListener(CART_EVENT, onChange);
-    return () => window.removeEventListener(CART_EVENT, onChange);
-  }, []);
+/** Header cart link. The count reads browser storage, so it appears after hydration. */
+export function CartLink() {
+  const count = cartCount(useCart());
 
   return (
     <Link

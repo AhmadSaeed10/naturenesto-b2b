@@ -1,97 +1,109 @@
-// Server only: reads products with the anon key, so RLS shows active products only.
-import { cacheLife, cacheTag } from "next/cache";
+import "server-only";
+import { cacheLife } from "next/cache";
 import { catalogCategories } from "@/content/catalog";
-import { sampleProducts } from "@/content/sample-products";
-import type { CatalogSlug, Product, ProductBadge } from "@/content/types";
-import { mediaUrl } from "@/lib/media";
-import { createSupabasePublicClient } from "@/lib/supabase/server";
+import type { CatalogSlug, Product } from "@/content/types";
+import { reader } from "@/lib/cms/reader";
 
-export type CatalogSource = "supabase" | "sample";
+// Products are Keystatic entries in content/products, one YAML file per product. The
+// handle is the file name and the product page lives at /products/<handle>.
+
+export interface StoreProduct extends Product {
+  handle: string;
+  href: string;
+  images: { src: string; alt: string }[];
+  description: string;
+  sample: boolean;
+  seoTitle: string | null;
+  seoDescription: string | null;
+}
 
 export interface CatalogResult {
-  products: Product[];
-  source: CatalogSource;
+  products: StoreProduct[];
+  /** True while any listed product is placeholder data. */
+  hasSamples: boolean;
 }
 
-const BADGES: readonly ProductBadge[] = ["new", "pet-safe", "low-light", "easy-care", "bestseller"];
 const SLUGS: readonly string[] = catalogCategories.map((category) => category.slug);
-// Badges are stored as "badge:<name>" tags so they never collide with collection tags.
-const BADGE_PREFIX = "badge:";
-const DEFAULT_VARIANT = "Default";
-const PAISA_PER_RUPEE = 100;
+const isSlug = (value: string): value is CatalogSlug => SLUGS.includes(value);
+const orNull = (value: string): string | null => (value.trim() ? value : null);
 
-const SELECT = `
-  handle, title, tags,
-  product_variants (title, price, compare_at_price, stock, track_inventory, allow_backorder, position),
-  product_images (position, alt, media_assets (external_url, storage_path, alt, decorative))
-`;
-
-const isSlug = (tag: string): tag is CatalogSlug => SLUGS.includes(tag);
-const isBadge = (value: string): value is ProductBadge =>
-  (BADGES as readonly string[]).includes(value);
-const byPosition = <T extends { position: number }>(a: T, b: T): number => a.position - b.position;
-
-async function fetchFromSupabase(slug: CatalogSlug): Promise<Product[] | null> {
-  const supabase = createSupabasePublicClient();
-  if (!supabase) return null;
-
-  const { data, error } = await supabase
-    .from("products")
-    .select(SELECT)
-    .eq("status", "active")
-    .is("deleted_at", null)
-    .contains("tags", [slug])
-    .order("title");
-  if (error) {
-    console.warn(`[catalog] Supabase query failed for "${slug}"`, error.message);
-    return null;
-  }
-
-  return data.flatMap((row): Product[] => {
-    const variant = [...row.product_variants].sort(byPosition)[0];
-    const image = [...row.product_images].sort(byPosition)[0];
-    if (!variant || !image?.media_assets) return [];
-    const media = image.media_assets;
-    const inStock = row.product_variants.some(
-      (v) => !v.track_inventory || v.allow_backorder || v.stock > 0,
-    );
-    return [
-      {
-        id: row.handle,
-        name: row.title,
-        price: variant.price / PAISA_PER_RUPEE,
-        compareAtPrice:
-          variant.compare_at_price === null
-            ? undefined
-            : variant.compare_at_price / PAISA_PER_RUPEE,
-        categories: row.tags.filter(isSlug),
-        image: { src: mediaUrl(media), alt: media.decorative ? "" : (image.alt ?? media.alt) },
-        size: variant.title === DEFAULT_VARIANT ? undefined : variant.title,
-        badges: row.tags
-          .filter((tag) => tag.startsWith(BADGE_PREFIX))
-          .map((tag) => tag.slice(BADGE_PREFIX.length))
-          .filter(isBadge),
-        inStock,
-        href: `/products/${row.handle}`,
-      },
-    ];
+export async function listProducts(): Promise<StoreProduct[]> {
+  "use cache";
+  cacheLife("max");
+  const entries = await reader.collections.products.all().catch((error: unknown) => {
+    console.warn("[catalog] could not read content/products", error);
+    return [];
   });
+  return entries
+    .flatMap(({ slug, entry }): StoreProduct[] => {
+      const images = entry.images.flatMap((image) =>
+        image.src ? [{ src: image.src, alt: image.alt }] : [],
+      );
+      const [first] = images;
+      if (!first) return [];
+      return [
+        {
+          id: slug,
+          handle: slug,
+          href: `/products/${slug}`,
+          name: entry.title,
+          price: entry.price,
+          compareAtPrice:
+            entry.compareAtPrice !== null && entry.compareAtPrice > entry.price
+              ? entry.compareAtPrice
+              : undefined,
+          categories: entry.categories.filter(isSlug),
+          image: first,
+          images,
+          size: orNull(entry.size) ?? undefined,
+          badges: [...entry.badges],
+          inStock: entry.inStock,
+          sample: entry.sample,
+          description: entry.description,
+          seoTitle: orNull(entry.seoTitle),
+          seoDescription: orNull(entry.seoDescription),
+        },
+      ];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Products for one category. Uses Supabase when it is configured and returns active
- * products; otherwise falls back to the sample catalogue so pages never render empty.
- */
+/** Products listed under one category. */
 export async function getCatalog(slug: CatalogSlug): Promise<CatalogResult> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag("products", `products:${slug}`);
+  const products = (await listProducts()).filter((product) => product.categories.includes(slug));
+  return { products, hasSamples: products.some((product) => product.sample) };
+}
 
-  const live = await fetchFromSupabase(slug);
-  if (live && live.length > 0) return { products: live, source: "supabase" };
+export async function getProduct(handle: string): Promise<StoreProduct | null> {
+  return (await listProducts()).find((product) => product.handle === handle) ?? null;
+}
 
-  return {
-    products: sampleProducts.filter((product) => product.categories.includes(slug)),
-    source: "sample",
-  };
+export async function listProductHandles(): Promise<string[]> {
+  return (await listProducts()).map((product) => product.handle);
+}
+
+/** What the cart and checkout need to show and price a line, keyed by handle. */
+export interface CartProduct {
+  handle: string;
+  name: string;
+  price: number;
+  size: string | null;
+  image: string;
+  inStock: boolean;
+}
+
+export async function getCartCatalog(): Promise<Record<string, CartProduct>> {
+  return Object.fromEntries(
+    (await listProducts()).map((p) => [
+      p.handle,
+      {
+        handle: p.handle,
+        name: p.name,
+        price: p.price,
+        size: p.size ?? null,
+        image: p.image.src,
+        inStock: p.inStock,
+      },
+    ]),
+  );
 }

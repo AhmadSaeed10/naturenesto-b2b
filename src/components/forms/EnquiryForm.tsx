@@ -45,7 +45,7 @@ export function EnquiryForm({ kind, whatsappHref, email }: EnquiryFormProps) {
     if (state.status === "invalid") {
       form.current?.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
     }
-    if (state.status === "not_connected") status.current?.focus();
+    if (state.status === "not_connected" || state.status === "sent") status.current?.focus();
   }, [state]);
 
   const onBlur = (
@@ -62,6 +62,20 @@ export function EnquiryForm({ kind, whatsappHref, email }: EnquiryFormProps) {
     if (!value && !errors[name]) return;
     setInline((current) => ({ ...current, [name]: validateField(name, value) }));
   };
+
+  if (state.status === "sent") {
+    return (
+      <div
+        ref={status}
+        tabIndex={-1}
+        role="status"
+        className="rounded-card bg-surface p-8 text-ink outline-none"
+      >
+        <p className="mb-3 font-serif text-h3">{forms.sent.title}</p>
+        <p className="max-w-prose">{forms.sent.body}</p>
+      </div>
+    );
+  }
 
   if (state.status === "not_connected") {
     return (

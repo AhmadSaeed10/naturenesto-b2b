@@ -15,7 +15,7 @@ interface CategoryViewProps {
 const whatsappHref = needHelp.channels.find((channel) => channel.kind === "whatsapp")?.href ?? "";
 
 export async function CategoryView({ category }: CategoryViewProps) {
-  const { products, source } = await getCatalog(category.slug);
+  const { products, hasSamples } = await getCatalog(category.slug);
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-16 md:px-8 md:py-24">
@@ -27,7 +27,7 @@ export async function CategoryView({ category }: CategoryViewProps) {
 
       <CategoryChips current={category.slug} />
 
-      {source === "sample" ? (
+      {hasSamples ? (
         <p
           role="note"
           className="mt-6 rounded-card border border-dashed border-ink/30 px-5 py-3 text-small text-ink"
