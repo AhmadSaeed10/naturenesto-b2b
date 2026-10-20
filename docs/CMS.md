@@ -4,10 +4,16 @@ There is no database. Content, products and settings are files in `content/`, ed
 
 ## Setting up Keystatic on Vercel (once)
 
-1. On Vercel, set `NEXT_PUBLIC_KEYSTATIC_STORAGE=github` and redeploy.
-2. Open `https://<site>/keystatic`. Keystatic offers to create a GitHub App: follow it. It prints `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET` and `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`.
-3. Add those four to Vercel (Production and Preview) and redeploy.
-4. Install the app on the `naturenesto-b2b` repository only.
+Keystatic only creates its GitHub App from a local dev server; the live site refuses to.
+
+1. Deploy the repo on Vercel once and note the production URL.
+2. Locally, create `.env.local` with `NEXT_PUBLIC_KEYSTATIC_STORAGE=github`, run `npm run dev` and open `http://127.0.0.1:3000/keystatic`.
+3. On the setup screen, enter the production URL as "Deployed App URL", leave "GitHub organization" blank, and press "Create GitHub App". On GitHub, confirm the app name and create it.
+4. You land back on Keystatic, which has written `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET` and `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` to `.env` (git ignored). Install the app on the `naturenesto-b2b` repository only.
+5. On Vercel, add those four plus `NEXT_PUBLIC_KEYSTATIC_STORAGE=github` (Production and Preview) and redeploy.
+6. Open `https://<site>/keystatic` and sign in with GitHub.
+
+Sign in works on the URLs registered as callback URLs in the GitHub App (production and 127.0.0.1). To edit on another domain, add `https://<domain>/api/keystatic/github/oauth/callback` under the app's settings on GitHub.
 
 Who can edit: anyone with write access to the GitHub repository. Add or remove editors as repository collaborators. Saves on `main` go live; editing on a branch (branch picker in Keystatic) produces a preview deploy to review first.
 
