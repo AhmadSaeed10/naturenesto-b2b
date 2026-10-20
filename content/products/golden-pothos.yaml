@@ -1,0 +1,16 @@
+title: Golden Pothos
+price: 1200
+compareAtPrice: 1500
+size: Hanging, 30 cm
+categories:
+  - indoor-plants
+  - easy-care
+  - low-light
+badges:
+  - easy-care
+inStock: true
+sample: true
+images:
+  - src: /images/products/golden-pothos/pothos.webp
+    alt: ""
+description: ""

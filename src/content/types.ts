@@ -54,19 +54,22 @@ export interface Step {
   flag?: string;
 }
 
-export type IconName =
-  | "plant"
-  | "vase"
-  | "table"
-  | "guidance"
-  | "community"
-  | "support"
-  | "floorplan"
-  | "leaf"
-  | "poster"
-  | "gift"
-  | "pot"
-  | "building";
+export const ICON_NAMES = [
+  "plant",
+  "vase",
+  "table",
+  "guidance",
+  "community",
+  "support",
+  "floorplan",
+  "leaf",
+  "poster",
+  "gift",
+  "pot",
+  "building",
+] as const;
+
+export type IconName = (typeof ICON_NAMES)[number];
 
 export interface IconItem {
   text: string;
@@ -114,7 +117,9 @@ export type CatalogSlug =
   | "low-light"
   | "plant-care";
 
-export type ProductBadge = "new" | "pet-safe" | "low-light" | "easy-care" | "bestseller";
+export const PRODUCT_BADGES = ["new", "pet-safe", "low-light", "easy-care", "bestseller"] as const;
+
+export type ProductBadge = (typeof PRODUCT_BADGES)[number];
 
 export interface Product {
   id: string;

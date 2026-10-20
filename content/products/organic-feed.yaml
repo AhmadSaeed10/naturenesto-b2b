@@ -1,0 +1,13 @@
+title: Organic Plant Feed
+price: 850
+size: 1 kg
+categories:
+  - plant-care
+  - easy-care
+badges: []
+inStock: true
+sample: true
+images:
+  - src: /images/products/organic-feed/care-soil.webp
+    alt: ""
+description: ""

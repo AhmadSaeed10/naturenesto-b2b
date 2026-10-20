@@ -1,0 +1,28 @@
+announcement:
+  enabled: true
+  message: Transform your space with exclusive discounts!
+email: info@naturenesto.com
+address: 83/S Commercial Block, 1st Floor Rabeel, Imperial Garden, Paragon City Barki Road Lahore
+legal: 2026 Nature Nesto, All Rights Reserved.
+whatsapp: "+923180427602"
+socials:
+  - platform: facebook
+    label: Facebook
+    href: "#"
+  - platform: instagram
+    label: Instagram
+    href: "#"
+  - platform: linkedin
+    label: LinkedIn
+    href: "#"
+  - platform: twitter
+    label: Twitter
+    href: "#"
+seo:
+  title: Nature Nesto | Plants, Pots and Plant Styling in Lahore
+  description: Bring life to your space with Nature Nesto, a Lahore plant and decor studio. Indoor and outdoor plants, pots and planters, and personalised plant styling.
+delivery:
+  lahore: 250
+  punjab: 400
+  pakistan: 600
+  freeOver: 15000

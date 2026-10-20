@@ -1,0 +1,13 @@
+title: Brass Spout Watering Can
+price: 2100
+size: 1.5 L
+categories:
+  - plant-care
+badges:
+  - new
+inStock: true
+sample: true
+images:
+  - src: /images/products/watering-can/care-can.webp
+    alt: ""
+description: ""

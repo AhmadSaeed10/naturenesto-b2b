@@ -1,0 +1,16 @@
+title: Snake Plant
+price: 1800
+size: Small, 45 cm
+categories:
+  - indoor-plants
+  - easy-care
+  - low-light
+badges:
+  - easy-care
+  - low-light
+inStock: true
+sample: true
+images:
+  - src: /images/products/snake-plant/snake.webp
+    alt: ""
+description: ""

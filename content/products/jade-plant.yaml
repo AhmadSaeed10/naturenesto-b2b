@@ -1,0 +1,13 @@
+title: Jade Plant
+price: 1500
+size: Small, 30 cm
+categories:
+  - outdoor-plants
+  - easy-care
+badges: []
+inStock: true
+sample: true
+images:
+  - src: /images/products/jade-plant/succulent.webp
+    alt: ""
+description: ""

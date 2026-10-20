@@ -1,0 +1,13 @@
+title: Bougainvillea
+price: 1600
+size: Medium, 70 cm
+categories:
+  - outdoor-plants
+badges:
+  - bestseller
+inStock: true
+sample: true
+images:
+  - src: /images/products/bougainvillea/flowering.webp
+    alt: ""
+description: ""

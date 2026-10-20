@@ -1,0 +1,15 @@
+title: ZZ Plant
+price: 2200
+size: Small, 50 cm
+categories:
+  - indoor-plants
+  - easy-care
+  - low-light
+badges:
+  - low-light
+inStock: true
+sample: true
+images:
+  - src: /images/products/zz-plant/zz.webp
+    alt: ""
+description: ""

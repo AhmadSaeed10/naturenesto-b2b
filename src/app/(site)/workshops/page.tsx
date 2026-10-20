@@ -8,7 +8,7 @@ import { cms } from "@/content/cms";
 import { stubPages } from "@/content/pages";
 import { seo } from "@/content/seo";
 import { type Workshop, getWorkshopGroups } from "@/lib/cms/content";
-import { formatPaisa } from "@/lib/money";
+import { formatPrice } from "@/lib/format";
 import { pageMetadata } from "@/lib/seo";
 
 const stub = stubPages.find((page) => page.path === "/workshops");
@@ -59,7 +59,7 @@ function WorkshopCard({ workshop }: { workshop: Workshop }) {
           {workshop.price !== null ? (
             <div>
               <dt className="text-ink-muted">{copy.price}</dt>
-              <dd>{workshop.price === 0 ? copy.free : formatPaisa(workshop.price)}</dd>
+              <dd>{workshop.price === 0 ? copy.free : formatPrice(workshop.price)}</dd>
             </div>
           ) : null}
           {workshop.capacity ? (

@@ -1,0 +1,13 @@
+title: Premium Potting Mix
+price: 650
+size: 5 kg
+categories:
+  - plant-care
+badges:
+  - bestseller
+inStock: true
+sample: true
+images:
+  - src: /images/products/potting-mix/care-soil.webp
+    alt: ""
+description: ""

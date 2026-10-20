@@ -1,0 +1,14 @@
+title: Aloe Vera
+price: 800
+size: Small, 25 cm
+categories:
+  - outdoor-plants
+  - easy-care
+badges:
+  - easy-care
+inStock: true
+sample: true
+images:
+  - src: /images/products/aloe-vera/succulent.webp
+    alt: ""
+description: ""

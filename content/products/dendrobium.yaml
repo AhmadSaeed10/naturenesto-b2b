@@ -1,0 +1,13 @@
+title: Dendrobium Orchid
+price: 3600
+size: Single stem
+categories:
+  - orchids
+badges:
+  - new
+inStock: true
+sample: true
+images:
+  - src: /images/products/dendrobium/orchid.webp
+    alt: ""
+description: ""

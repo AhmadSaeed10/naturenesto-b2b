@@ -1,0 +1,15 @@
+title: Areca Palm
+price: 6500
+size: Large, 160 cm
+categories:
+  - indoor-plants
+  - large-plants
+  - pet-friendly
+badges:
+  - pet-safe
+inStock: true
+sample: true
+images:
+  - src: /images/products/areca-palm/areca.webp
+    alt: ""
+description: ""
