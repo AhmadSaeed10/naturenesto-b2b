@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { Cta, NavLink as NavLinkData, SocialLink } from "@/content/types";
 import { ui } from "@/content/ui";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +11,7 @@ import { NavLink } from "@/components/ui/NavLink";
 import { SocialLinks } from "@/components/ui/SocialLinks";
 
 interface MobileMenuProps {
+  shop: { label: string; links: readonly NavLinkData[] };
   links: readonly NavLinkData[];
   cta: Cta;
   socials: readonly SocialLink[];
@@ -18,7 +19,8 @@ interface MobileMenuProps {
 
 // Native <dialog> with showModal() provides the focus trap, Escape handling, inert
 // background and focus return to the trigger.
-export function MobileMenu({ links, cta, socials }: MobileMenuProps) {
+export function MobileMenu({ shop, links, cta, socials }: MobileMenuProps) {
+  const shopHeadingId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -86,7 +88,23 @@ export function MobileMenu({ links, cta, socials }: MobileMenuProps) {
             </button>
           </div>
 
-          <nav aria-label={ui.primaryNav} className="mt-10">
+          <nav aria-label={ui.primaryNav} className="mt-10 flex flex-col gap-8">
+            {shop.links.length ? (
+              <div>
+                <p id={shopHeadingId} className="mb-2 eyebrow text-ink-muted">
+                  {shop.label}
+                </p>
+                <ul aria-labelledby={shopHeadingId} className="grid grid-cols-2 gap-x-4">
+                  {shop.links.map((link) => (
+                    <li key={link.href}>
+                      <NavLink href={link.href} onNavigate={hide}>
+                        {link.label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <ul className="flex flex-col gap-1">
               {links.map((link) => (
                 <li key={link.href}>

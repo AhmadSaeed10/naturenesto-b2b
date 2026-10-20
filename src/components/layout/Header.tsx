@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { headerCta as defaultCta, headerNav as defaultNav } from "@/content/nav";
+import {
+  headerCta as defaultCta,
+  headerNav as defaultNav,
+  shopMenu as defaultShop,
+} from "@/content/nav";
 import { site } from "@/content/site";
 import type { Cta, NavLink as NavLinkData, SocialLink } from "@/content/types";
 import { ui } from "@/content/ui";
@@ -7,19 +11,22 @@ import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { NavLink } from "@/components/ui/NavLink";
 import { HeaderScroll } from "./HeaderScroll";
-import { CartIndicator } from "@/components/shop/CartIndicator";
+import { CartLink } from "@/components/shop/CartLink";
 import { MobileMenu } from "./MobileMenu";
+import { ShopMenu } from "./ShopMenu";
 
 export const HEADER_ID = "site-header";
 export const HEADER_HOME_LINK_ID = "site-header-home";
 
 interface HeaderProps {
+  shop?: { label: string; links: NavLinkData[] };
   nav?: NavLinkData[];
   cta?: Cta;
   socials?: SocialLink[];
 }
 
 export function Header({
+  shop = { label: defaultShop.label, links: [] },
   nav: headerNav = defaultNav,
   cta: headerCta = defaultCta,
   socials = [...site.socials],
@@ -50,6 +57,11 @@ export function Header({
 
         <nav aria-label={ui.primaryNav} className="hidden xl:block">
           <ul className="flex items-center gap-7">
+            {shop.links.length ? (
+              <li>
+                <ShopMenu label={shop.label} links={shop.links} />
+              </li>
+            ) : null}
             {headerNav.map((link) => (
               <li key={link.href}>
                 <NavLink href={link.href}>{link.label}</NavLink>
@@ -65,8 +77,8 @@ export function Header({
               {headerCta.label}
             </Button>
           </div>
-          <CartIndicator />
-          <MobileMenu links={headerNav} cta={headerCta} socials={socials} />
+          <CartLink />
+          <MobileMenu shop={shop} links={headerNav} cta={headerCta} socials={socials} />
         </div>
       </div>
     </header>
