@@ -13,6 +13,8 @@ Keystatic only creates its GitHub App from a local dev server; the live site ref
 5. On Vercel, add those four plus `NEXT_PUBLIC_KEYSTATIC_STORAGE=github` (Production and Preview) and redeploy.
 6. Open `https://<site>/keystatic` and sign in with GitHub.
 
+Without Node on your computer, create the app by hand on GitHub instead of steps 2 to 4: Settings > Developer settings > GitHub Apps > New GitHub App. Homepage URL: the site. Callback URL: `https://<site>/api/keystatic/github/oauth/callback`. Tick "Request user authorization (OAuth) during installation". Untick Webhook "Active". Repository permissions: Contents read and write, Pull requests read only. Create it, then generate a client secret, and install it on `naturenesto-b2b` only. `KEYSTATIC_SECRET` is any random string of 64 or more characters; the app slug is the last part of its `github.com/apps/<slug>` address.
+
 Sign in works on the URLs registered as callback URLs in the GitHub App (production and 127.0.0.1). To edit on another domain, add `https://<domain>/api/keystatic/github/oauth/callback` under the app's settings on GitHub.
 
 Who can edit: anyone with write access to the GitHub repository. Add or remove editors as repository collaborators. Saves on `main` go live; editing on a branch (branch picker in Keystatic) produces a preview deploy to review first.
