@@ -29,11 +29,8 @@ The live site is not reachable from the build environment. All homepage copy, li
 - ESLint, Prettier, absolute imports via `@/`
 - Deploy: GitHub + Vercel
 
-## Backend (Supabase)
-Project ref: uqxzuzejnyacrshssdpz (NatureNesto-Mumbai, ap-south-1). Secrets only in .env.local, Vercel env and GitHub Actions secrets, never in code, logs or commits. Service role key is server only. All schema changes are migrations in supabase/migrations. The database is the source of truth for products, orders, customers, media and CMS content. Admin lives at /admin (noindex, role gated). Follow docs/ADMIN.md.
-
-## Backend (Neon, in progress)
-The backend is moving from Supabase to Neon Postgres on free tiers (see docs/NEON.md). New schema changes are migrations in `db/migrations`, applied with `npm run db:migrate`. There is no row level security: check the user's role in server code before any write, and run writes through `withActor` in `src/lib/db` so the audit log records who did it. Until the data layer phase lands, the app still reads from Supabase and the Supabase section above applies.
+## Backend (Neon)
+Neon Postgres on free tiers (see docs/NEON.md). Secrets only in .env.local, Vercel env and GitHub Actions secrets, never in code, logs or commits. All schema changes are migrations in `db/migrations`, applied with `npm run db:migrate`. The database is the source of truth for products, orders, customers, media and CMS content. Sign in is Better Auth (emailed link, Resend). There is no row level security: check the user's role in server code before any read or write of admin data (`requireStaff`, `staffWithRole`), and run writes through `withActor` in `src/lib/db` so the audit log records who did it. Admin lives at /admin (noindex, role gated). Follow docs/ADMIN.md.
 
 ## Commands
 - `npm run dev` start dev server

@@ -1,7 +1,7 @@
 // Confirms the connection strings work and shows what the database looks like.
 // Prints host and database only, never credentials.
-import { Pool } from "@neondatabase/serverless";
 import pg from "pg";
+import { normalizeDatabaseUrl } from "../../src/lib/db/url.ts";
 import { describeTarget, fail } from "./lib.ts";
 
 async function probe(label: string, url: string | undefined): Promise<void> {
@@ -9,7 +9,7 @@ async function probe(label: string, url: string | undefined): Promise<void> {
     console.log(`${label}: not set`);
     return;
   }
-  const client = new pg.Client({ connectionString: url });
+  const client = new pg.Client({ connectionString: normalizeDatabaseUrl(url) });
   const started = Date.now();
   try {
     await client.connect();
@@ -49,23 +49,4 @@ if (direct?.includes("-pooler")) {
   console.log(
     "Note: DATABASE_URL_UNPOOLED has -pooler in its host. Migrations need the direct string.",
   );
-}
-
-// The app talks to Neon through the serverless driver, not pg, so exercise that path too.
-// It needs Neon's websocket endpoint, so it is skipped for local databases.
-if (pooled?.includes("neon.tech")) {
-  const pool = new Pool({ connectionString: pooled });
-  try {
-    const { rows } = await pool.query<{ ok: number }>("select 1 as ok");
-    console.log(
-      `App driver (@neondatabase/serverless over DATABASE_URL): ${rows[0]?.ok === 1 ? "ok" : "unexpected result"}`,
-    );
-  } catch (error) {
-    console.log(
-      `App driver (@neondatabase/serverless over DATABASE_URL): FAILED  ${error instanceof Error ? error.message : error}`,
-    );
-    process.exitCode = 1;
-  } finally {
-    await pool.end().catch(() => undefined);
-  }
 }

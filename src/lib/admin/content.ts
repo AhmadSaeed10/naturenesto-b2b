@@ -7,8 +7,20 @@ import {
   parseSection,
   sectionFallbacks,
 } from "@/lib/cms/sections";
-import type { Enums } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { asc, desc, eq, ne, sql } from "drizzle-orm";
+import { db } from "@/lib/db";
+import type { Enums, Json } from "@/lib/db/enums";
+import {
+  blogPosts,
+  faqItems,
+  navigationItems,
+  navigationMenus,
+  pageSectionDrafts,
+  pageSections,
+  pages,
+  redirects,
+  workshops,
+} from "@/lib/db/schema";
 
 type ContentStatus = Enums<"content_status">;
 
@@ -20,16 +32,22 @@ export interface SectionSummary {
 }
 
 async function homeRows() {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("page_sections")
-    .select("type, data, status, page_section_drafts (data), pages!inner (handle)")
-    .eq("pages.handle", "home");
-  return (data ?? []).map((row) => ({
-    type: row.type,
-    data: row.data,
+  const rows = await db()
+    .select({
+      type: pageSections.type,
+      data: pageSections.data,
+      status: pageSections.status,
+      draft: pageSectionDrafts.data,
+    })
+    .from(pageSections)
+    .innerJoin(pages, eq(pages.id, pageSections.pageId))
+    .leftJoin(pageSectionDrafts, eq(pageSectionDrafts.sectionId, pageSections.id))
+    .where(eq(pages.handle, "home"));
+  return rows.map((row) => ({
+    type: row.type as string,
+    data: row.data as unknown,
     status: row.status,
-    draft: row.page_section_drafts?.data ?? null,
+    draft: (row.draft ?? null) as unknown,
   }));
 }
 
@@ -84,44 +102,56 @@ export interface DocSummary {
 }
 
 export async function listDocs(kind: "pages" | "blog" | "workshops"): Promise<DocSummary[]> {
-  const supabase = await createSupabaseServerClient();
   if (kind === "pages") {
-    const { data } = await supabase
-      .from("pages")
-      .select("id, title, handle, status, updated_at")
-      .neq("handle", "home")
-      .order("title");
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      title: row.title,
-      handle: row.handle,
-      status: row.status,
-      date: row.updated_at,
-    }));
+    const rows = await db()
+      .select({
+        id: pages.id,
+        title: pages.title,
+        handle: pages.handle,
+        status: pages.status,
+        updatedAt: pages.updatedAt,
+      })
+      .from(pages)
+      .where(ne(pages.handle, "home"))
+      .orderBy(asc(pages.title));
+    return rows.map((row) => ({ ...row, date: row.updatedAt.toISOString() }));
   }
   if (kind === "blog") {
-    const { data } = await supabase
-      .from("blog_posts")
-      .select("id, title, handle, status, published_at, updated_at")
-      .order("updated_at", { ascending: false });
-    return (data ?? []).map((row) => ({
+    const rows = await db()
+      .select({
+        id: blogPosts.id,
+        title: blogPosts.title,
+        handle: blogPosts.handle,
+        status: blogPosts.status,
+        publishedAt: blogPosts.publishedAt,
+        updatedAt: blogPosts.updatedAt,
+      })
+      .from(blogPosts)
+      .orderBy(desc(blogPosts.updatedAt));
+    return rows.map((row) => ({
       id: row.id,
       title: row.title,
       handle: row.handle,
       status: row.status,
-      date: row.published_at ?? row.updated_at,
+      date: (row.publishedAt ?? row.updatedAt).toISOString(),
     }));
   }
-  const { data } = await supabase
-    .from("workshops")
-    .select("id, title, handle, status, starts_at")
-    .order("starts_at", { ascending: false, nullsFirst: true });
-  return (data ?? []).map((row) => ({
+  const rows = await db()
+    .select({
+      id: workshops.id,
+      title: workshops.title,
+      handle: workshops.handle,
+      status: workshops.status,
+      startsAt: workshops.startsAt,
+    })
+    .from(workshops)
+    .orderBy(sql`${workshops.startsAt} desc nulls first`);
+  return rows.map((row) => ({
     id: row.id,
     title: row.title,
     handle: row.handle,
     status: row.status,
-    date: row.starts_at,
+    date: row.startsAt?.toISOString() ?? null,
   }));
 }
 
@@ -137,23 +167,21 @@ export interface PageForEditor {
 }
 
 export async function getPageForEditor(id: string): Promise<PageForEditor | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("pages")
-    .select("*")
-    .eq("id", id)
-    .neq("handle", "home")
-    .maybeSingle();
+  const [data] = await db()
+    .select()
+    .from(pages)
+    .where(sql`${pages.id} = ${id} and ${pages.handle} <> 'home'`)
+    .limit(1);
   return data
     ? {
         id: data.id,
         title: data.title,
         handle: data.handle,
-        body: richTextSource(data.body),
+        body: richTextSource(data.body as Json),
         published: data.status === "published",
-        seoTitle: data.seo_title ?? "",
-        seoDescription: data.seo_description ?? "",
-        version: data.updated_at,
+        seoTitle: data.seoTitle ?? "",
+        seoDescription: data.seoDescription ?? "",
+        version: data.updatedAt.toISOString(),
       }
     : null;
 }
@@ -174,22 +202,21 @@ export interface PostForEditor {
 }
 
 export async function getPostForEditor(id: string): Promise<PostForEditor | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.from("blog_posts").select("*").eq("id", id).maybeSingle();
+  const [data] = await db().select().from(blogPosts).where(eq(blogPosts.id, id)).limit(1);
   return data
     ? {
         id: data.id,
         title: data.title,
         handle: data.handle,
         excerpt: data.excerpt ?? "",
-        coverId: data.cover_media_id ?? "",
+        coverId: data.coverMediaId ?? "",
         tags: data.tags,
-        body: richTextSource(data.body),
+        body: richTextSource(data.body as Json),
         published: data.status === "published",
-        publishedAt: data.published_at ?? "",
-        seoTitle: data.seo_title ?? "",
-        seoDescription: data.seo_description ?? "",
-        version: data.updated_at,
+        publishedAt: data.publishedAt?.toISOString() ?? "",
+        seoTitle: data.seoTitle ?? "",
+        seoDescription: data.seoDescription ?? "",
+        version: data.updatedAt.toISOString(),
       }
     : null;
 }
@@ -211,23 +238,22 @@ export interface WorkshopForEditor {
 }
 
 export async function getWorkshopForEditor(id: string): Promise<WorkshopForEditor | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.from("workshops").select("*").eq("id", id).maybeSingle();
+  const [data] = await db().select().from(workshops).where(eq(workshops.id, id)).limit(1);
   return data
     ? {
         id: data.id,
         title: data.title,
         handle: data.handle,
         summary: data.summary ?? "",
-        coverId: data.cover_media_id ?? "",
-        body: richTextSource(data.body),
-        startsAt: data.starts_at ?? "",
-        endsAt: data.ends_at ?? "",
+        coverId: data.coverMediaId ?? "",
+        body: richTextSource(data.body as Json),
+        startsAt: data.startsAt?.toISOString() ?? "",
+        endsAt: data.endsAt?.toISOString() ?? "",
         location: data.location ?? "",
         capacity: data.capacity === null ? "" : String(data.capacity),
         price: data.price,
         published: data.status === "published",
-        version: data.updated_at,
+        version: data.updatedAt.toISOString(),
       }
     : null;
 }
@@ -242,16 +268,14 @@ export interface FaqForEditor {
 }
 
 export async function listFaqForEditor(): Promise<FaqForEditor[]> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("faq_items")
-    .select("*")
-    .order("position")
-    .order("created_at");
-  return (data ?? []).map((row) => ({
+  const rows = await db()
+    .select()
+    .from(faqItems)
+    .orderBy(asc(faqItems.position), asc(faqItems.createdAt));
+  return rows.map((row) => ({
     id: row.id,
     question: row.question,
-    answer: richTextSource(row.answer),
+    answer: richTextSource(row.answer as Json),
     category: row.category ?? "",
     position: row.position,
     published: row.status === "published",
@@ -266,11 +290,29 @@ export interface MenuForEditor {
 }
 
 export async function listMenus(): Promise<MenuForEditor[]> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("navigation_menus")
-    .select("id, handle, title, navigation_items (label, href, position)")
-    .order("handle");
+  const rows = await db()
+    .select({
+      id: navigationMenus.id,
+      handle: navigationMenus.handle,
+      title: navigationMenus.title,
+      label: navigationItems.label,
+      href: navigationItems.href,
+    })
+    .from(navigationMenus)
+    .leftJoin(navigationItems, eq(navigationItems.menuId, navigationMenus.id))
+    .orderBy(asc(navigationMenus.handle), asc(navigationItems.position));
+  const menus = new Map<string, MenuForEditor>();
+  for (const row of rows) {
+    const menu = menus.get(row.id) ?? {
+      id: row.id,
+      handle: row.handle,
+      title: row.title,
+      items: [],
+    };
+    if (row.label !== null && row.href !== null)
+      menu.items.push({ label: row.label, href: row.href });
+    menus.set(row.id, menu);
+  }
   // Header menus first, then the footer columns in their storefront order.
   const order = [
     "header",
@@ -280,16 +322,7 @@ export async function listMenus(): Promise<MenuForEditor[]> {
     "footer-explore",
   ];
   const rank = (handle: string) => (order.includes(handle) ? order.indexOf(handle) : order.length);
-  return (data ?? [])
-    .map((menu) => ({
-      id: menu.id,
-      handle: menu.handle,
-      title: menu.title,
-      items: [...menu.navigation_items]
-        .sort((a, b) => a.position - b.position)
-        .map(({ label, href }) => ({ label, href })),
-    }))
-    .sort((a, b) => rank(a.handle) - rank(b.handle));
+  return [...menus.values()].sort((a, b) => rank(a.handle) - rank(b.handle));
 }
 
 export interface RedirectRow {
@@ -300,10 +333,13 @@ export interface RedirectRow {
 }
 
 export async function listRedirects(): Promise<RedirectRow[]> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("redirects")
-    .select("id, source, destination, permanent")
-    .order("source");
-  return data ?? [];
+  return db()
+    .select({
+      id: redirects.id,
+      source: redirects.source,
+      destination: redirects.destination,
+      permanent: redirects.permanent,
+    })
+    .from(redirects)
+    .orderBy(asc(redirects.source));
 }

@@ -1,8 +1,11 @@
 import { MenuEditor } from "@/components/admin/content/MenuEditor";
 import { admin } from "@/content/admin";
 import { listMenus } from "@/lib/admin/content";
+import { ACCESS, requireStaff } from "@/lib/auth/staff";
 
 export default async function NavigationPage() {
+  // The layout gates the panel too; checking here keeps this page safe on its own.
+  await requireStaff(ACCESS.content);
   const menus = await listMenus();
   return (
     <div className="flex flex-col gap-6">

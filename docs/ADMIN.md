@@ -1,6 +1,6 @@
 # Admin and backend
 
-The database (Supabase, project `uqxzuzejnyacrshssdpz`, region Mumbai) is the source of truth for products, content, media, leads and, from Stage E, orders and customers. The admin lives at `/admin`. This file grows with each Phase 9 stage.
+The database (Neon Postgres, see docs/NEON.md) is the source of truth for products, content, media, leads and, from Stage E, orders and customers. The admin lives at `/admin`. This file grows with each Phase 9 stage.
 
 ## Roles
 
@@ -44,11 +44,11 @@ There is no public sign up. Owners and admins invite people in **Settings > Staf
 - **Pricing** happens in the database (`cart_totals`), so the checkout preview and the placed order always agree. `place_order` runs in one transaction: it locks the variants, refuses oversells, applies the discount, decrements stock (logged in Inventory as "sold") and records the pending payment.
 - **Placeholders to confirm with the client:** delivery Lahore Rs 250, rest of Punjab Rs 400, rest of Pakistan Rs 600, free over Rs 15,000. GST 0 percent and included in prices. Cash on delivery on; bank transfer off. Edit them in Settings > Shipping & payments.
 - Card payments arrive in Stage G with the chosen gateway. No card data is ever stored.
-- Checkout needs the three Supabase environment variables on Vercel. Without them the cart icon is hidden and product pages show the WhatsApp enquiry only.
+- Checkout needs `DATABASE_URL` on Vercel. Without them the cart icon is hidden and product pages show the WhatsApp enquiry only.
 
 ## How to edit content
 
-The database is the source of truth for storefront content. Every read falls back to the copy in `src/content` when Supabase is unreachable or a block is invalid, so the site never renders empty. Saves revalidate the matching cache tag, so changes are live within moments with no redeploy.
+The database is the source of truth for storefront content. Every read falls back to the copy in `src/content` when the database is unreachable or a block is invalid, so the site never renders empty. Saves revalidate the matching cache tag, so changes are live within moments with no redeploy.
 
 - **Homepage** (Content > Homepage): open a section, edit it, **Save draft**, then **Preview** (opens `/preview`, staff only, with drafts applied) and **Publish**. The live homepage only changes on publish. **Hide section** removes it from the homepage without deleting it. Drafts are stored in `page_section_drafts`, which only content staff can read.
 - **Pages** (Content > Pages): a published page with the handle `about`, `our-story`, `careers`, `shipping` or `workplace-policy` replaces that page's placeholder. Handles used by real routes (for example `contact` or `services`) are refused.
@@ -72,38 +72,38 @@ Stock never changes silently: the editor sets starting stock once, and every lat
 
 One row per variant, grouped by `Handle`. Product fields are read from the first row of each handle. Existing products are matched by handle and variants by SKU (or variant title when there is no SKU); a different `Stock` value is logged as an import adjustment. Prices are rupees. Images, collections and categories are not part of the file and are kept as they are. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` on export so spreadsheets do not run them as formulas.
 
-## Supabase Auth settings (dashboard, one time)
+## Sign in (Better Auth)
 
-- Authentication > URL Configuration: Site URL `https://naturenesto.com`. Redirect URLs: `https://naturenesto.com/auth/callback`, `https://*-<vercel-team>.vercel.app/auth/callback` (Vercel previews; use your team slug) and `http://localhost:3000/auth/callback`.
-- Authentication > Sign In / Providers: turn off "Allow new users to sign up". Staff accounts are created by the server, so this does not block invites.
-- Authentication > Emails: the default sender is rate limited and for testing only. Add custom SMTP before launch (decided in Stage G).
+Staff and customers sign in with an emailed link (staff can also set a password). Accounts live in the `auth_*` tables in Neon. Staff access is by invite only: an email can sign in only if it has a row in `staff_invites` or a profile with a role. Public sign up is closed.
+
+First owner: `npm run auth:owner -- you@example.com`, then sign in at `/admin/login` with that email. More staff are invited from Settings > Staff.
+
+Without `RESEND_API_KEY` (development) the sign in link is printed in the server terminal. In production the key and a verified sending domain are required, or no link can be delivered.
 
 ## Environment variables
 
-See `.env.example`. In Vercel (Production and Preview): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`. In GitHub Actions secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF`. The database password never goes to Vercel.
+See `.env.example`. In Vercel (Production and Preview): `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_SITE_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and for media `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `NEXT_PUBLIC_MEDIA_BASE_URL`. In GitHub Actions secrets: `DATABASE_URL_UNPOOLED` (used by the Migrate workflow). The direct database string never goes to Vercel.
 
-Without the Supabase variables the storefront still works on the sample catalogue and `/admin/login` shows that sign in is not available.
+Without the database variables the storefront still works on the sample catalogue and `/admin/login` shows that sign in is not available.
 
 ## Migrations
 
-All schema lives in `supabase/migrations`, committed to git. No dashboard schema edits.
+All schema lives in `db/migrations`, committed to git. No console schema edits.
 
-The Supabase connector used during development cannot run migrations that contain `delete` or `drop` statements (it asks for a confirmation that cannot be answered from an agent session). Those migrations reach the hosted project only through the Migrate workflow, so the GitHub secrets below are required.
+1. Write a new file `db/migrations/<next number>_<name>.sql`. Applied files are never edited.
+2. Open a PR. CI starts a throwaway Postgres, applies every migration and the seed, and runs `npm run db:smoke`.
+3. On merge to main, the Migrate workflow runs `npm run db:migrate` against Neon. Migrations already applied are skipped.
 
-1. Write a new file `supabase/migrations/<timestamp>_<name>.sql`.
-2. Open a PR. CI starts a throwaway local database, applies every migration and the seed, and runs the pgTAP tests in `supabase/tests`.
-3. On merge to main, the Migrate workflow runs `supabase db push` against the hosted project. Migrations already applied are skipped.
+Rules: there is no row level security. Every admin action checks the role with `requireStaff` or `staffWithRole`, and writes go through `withActor` so the audit log records who did them. Tables keep `updated_at` and audit triggers (copy the loops in the catalog migration). Money is stored in paisa (PKR x 100).
 
-Rules: every table gets RLS, `updated_at` and audit triggers (copy the loops in the catalog migration). Policies call the helpers in the `private` schema: `private.is_staff()`, `private.has_role(array[...]::public.staff_role[])`. Money is stored in paisa (PKR x 100).
-
-Regenerate types after a schema change: `npx supabase gen types typescript --project-id uqxzuzejnyacrshssdpz > src/lib/supabase/database.types.ts`.
+Types come from `src/lib/db/schema.ts` (Drizzle). After a schema change update it by hand, or run `npx drizzle-kit pull` against a scratch database and copy the changed tables.
 
 ## Seed
 
-`npm run seed:generate` writes `supabase/seed.sql` from `src/content` (settings, navigation, homepage sections, services, the nine category collections, redirects and the sample products as drafts). CI fails if the file is out of date. The seed is idempotent and was applied to the hosted project once. It never contains staff emails.
+`npm run seed:generate` writes `db/seed.sql` from `src/content` (settings, navigation, homepage sections, services, the nine category collections, redirects and the sample products as drafts). CI fails if the file is out of date. The seed is idempotent (`npm run db:seed`). It never contains staff emails.
 
 The sample products are drafts, so the storefront keeps showing the sample catalogue until real products are set to active.
 
 ## Restoring a backup
 
-Free plan projects get daily backups for 7 days (Database > Backups). Point in time recovery needs Pro. The optional nightly JSON snapshot to a `content-backup` branch is off until approved.
+Neon keeps a short history window on the free plan (check the console under Backup & Restore). Export the catalogue any time from Products > Export CSV.

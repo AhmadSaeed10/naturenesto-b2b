@@ -1,29 +1,26 @@
 "use server";
 
+import { and, count, eq, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ACCESS, type StaffRole, staffWithRole } from "@/lib/auth/staff";
-import { Constants } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { withActor } from "@/lib/db";
+import { profiles, staffInvites, staffRole } from "@/lib/db/schema";
 
 export interface StaffActionState {
   status: "idle" | "done" | "invalid" | "exists" | "forbidden" | "last_owner" | "failed";
 }
 
 const STAFF_PATH = "/admin/settings/staff";
-const role = z.enum(Constants.public.Enums.staff_role);
+const role = z.enum(staffRole.enumValues);
 
 /** Admins manage everyone except owners; only owners grant or change the owner role. */
 const mayAssign = (actor: StaffRole, target: StaffRole): boolean =>
   actor === "owner" || target !== "owner";
 
-async function ownerCount(): Promise<number> {
-  const supabase = await createSupabaseServerClient();
-  const { count } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("role", "owner");
-  return count ?? 0;
+async function ownerCount(tx: Parameters<Parameters<typeof withActor>[1]>[0]): Promise<number> {
+  const [row] = await tx.select({ n: count() }).from(profiles).where(eq(profiles.role, "owner"));
+  return row?.n ?? 0;
 }
 
 export async function inviteStaff(
@@ -44,19 +41,23 @@ export async function inviteStaff(
   if (!parsed.success) return { status: "invalid" };
   if (!mayAssign(actor.role, parsed.data.role)) return { status: "forbidden" };
 
-  const supabase = await createSupabaseServerClient();
-  const { data: existing } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("email", parsed.data.email)
-    .not("role", "is", null)
-    .maybeSingle();
-  if (existing) return { status: "exists" };
-
-  const { error } = await supabase.from("staff_invites").insert(parsed.data);
-  if (error) return { status: error.code === "23505" ? "exists" : "failed" };
-  revalidatePath(STAFF_PATH);
-  return { status: "done" };
+  try {
+    return await withActor(actor.id, async (tx) => {
+      const [existing] = await tx
+        .select({ id: profiles.id })
+        .from(profiles)
+        .where(and(sql`lower(${profiles.email}) = ${parsed.data.email}`, isNotNull(profiles.role)))
+        .limit(1);
+      if (existing) return { status: "exists" as const };
+      await tx.insert(staffInvites).values(parsed.data);
+      return { status: "done" as const };
+    }).then((state) => {
+      if (state.status === "done") revalidatePath(STAFF_PATH);
+      return state;
+    });
+  } catch (error) {
+    return { status: (error as { code?: string }).code === "23505" ? "exists" : "failed" };
+  }
 }
 
 const memberSchema = z.object({
@@ -78,30 +79,35 @@ export async function updateStaffRole(
   if (!parsed.success) return { status: "invalid" };
   const nextRole = parsed.data.role || null;
 
-  const supabase = await createSupabaseServerClient();
-  const { data: member } = await supabase
-    .from("profiles")
-    .select("id, email, role")
-    .eq("id", parsed.data.id)
-    .maybeSingle();
-  if (!member?.role) return { status: "invalid" };
-  if (!mayAssign(actor.role, member.role) || (nextRole && !mayAssign(actor.role, nextRole))) {
-    return { status: "forbidden" };
+  try {
+    const state = await withActor(actor.id, async (tx): Promise<StaffActionState> => {
+      const [member] = await tx
+        .select({ id: profiles.id, email: profiles.email, role: profiles.role })
+        .from(profiles)
+        .where(eq(profiles.id, parsed.data.id))
+        .limit(1);
+      if (!member?.role) return { status: "invalid" };
+      if (!mayAssign(actor.role, member.role) || (nextRole && !mayAssign(actor.role, nextRole))) {
+        return { status: "forbidden" };
+      }
+      if (member.role === "owner" && nextRole !== "owner" && (await ownerCount(tx)) <= 1) {
+        return { status: "last_owner" };
+      }
+      // The guard_profile_role trigger re-checks these rules in the database.
+      await tx.update(profiles).set({ role: nextRole }).where(eq(profiles.id, member.id));
+      if (!nextRole) {
+        // Clear the invite too, so signing in again cannot restore the old role.
+        await tx
+          .delete(staffInvites)
+          .where(sql`lower(${staffInvites.email}) = ${member.email.toLowerCase()}`);
+      }
+      return { status: "done" };
+    });
+    if (state.status === "done") revalidatePath(STAFF_PATH);
+    return state;
+  } catch (error) {
+    return { status: (error as { code?: string }).code === "42501" ? "forbidden" : "failed" };
   }
-  if (member.role === "owner" && nextRole !== "owner" && (await ownerCount()) <= 1) {
-    return { status: "last_owner" };
-  }
-
-  // The guard_profile_role trigger re-checks these rules in the database.
-  const { error } = await supabase.from("profiles").update({ role: nextRole }).eq("id", member.id);
-  if (error) return { status: error.code === "42501" ? "forbidden" : "failed" };
-
-  if (!nextRole) {
-    // Clear the invite too, so signing in again cannot restore the old role.
-    await supabase.from("staff_invites").delete().eq("email", member.email.toLowerCase());
-  }
-  revalidatePath(STAFF_PATH);
-  return { status: "done" };
 }
 
 export async function revokeInvite(
@@ -113,17 +119,25 @@ export async function revokeInvite(
   const id = z.uuid().safeParse(formData.get("id"));
   if (!id.success) return { status: "invalid" };
 
-  const supabase = await createSupabaseServerClient();
-  const { data: invite } = await supabase
-    .from("staff_invites")
-    .select("id, role, accepted_at")
-    .eq("id", id.data)
-    .maybeSingle();
-  if (!invite || invite.accepted_at) return { status: "invalid" };
-  if (!mayAssign(actor.role, invite.role)) return { status: "forbidden" };
-
-  const { error } = await supabase.from("staff_invites").delete().eq("id", invite.id);
-  if (error) return { status: "failed" };
-  revalidatePath(STAFF_PATH);
-  return { status: "done" };
+  try {
+    const state = await withActor(actor.id, async (tx): Promise<StaffActionState> => {
+      const [invite] = await tx
+        .select({
+          id: staffInvites.id,
+          role: staffInvites.role,
+          acceptedAt: staffInvites.acceptedAt,
+        })
+        .from(staffInvites)
+        .where(eq(staffInvites.id, id.data))
+        .limit(1);
+      if (!invite || invite.acceptedAt) return { status: "invalid" };
+      if (!mayAssign(actor.role, invite.role)) return { status: "forbidden" };
+      await tx.delete(staffInvites).where(eq(staffInvites.id, invite.id));
+      return { status: "done" };
+    });
+    if (state.status === "done") revalidatePath(STAFF_PATH);
+    return state;
+  } catch {
+    return { status: "failed" };
+  }
 }

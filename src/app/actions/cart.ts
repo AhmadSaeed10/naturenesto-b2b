@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { RATE_LIMITS, clientIp, withinRateLimit } from "@/lib/rate-limit";
 import { commerceEnabled, ensureCart, readCartToken } from "@/lib/commerce/cart";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { and, eq, sql } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { cartItems, carts, products, productVariants } from "@/lib/db/schema";
 
 export type CartResult =
   | { ok: true; count: number }
@@ -14,24 +16,32 @@ const MAX_QUANTITY = 99;
 const variantSchema = z.uuid();
 const quantitySchema = z.number().int().min(0).max(MAX_QUANTITY);
 
-type Admin = ReturnType<typeof createSupabaseAdminClient>;
-
 /** Units the cart may hold for a variant: unlimited (99) unless stock is tracked. */
-async function sellable(supabase: Admin, variantId: string): Promise<number | null> {
-  const { data } = await supabase
-    .from("product_variants")
-    .select("stock, track_inventory, allow_backorder, products!inner (status, deleted_at)")
-    .eq("id", variantId)
-    .maybeSingle();
-  if (!data || data.products.status !== "active" || data.products.deleted_at) return null;
-  return data.track_inventory && !data.allow_backorder
+async function sellable(variantId: string): Promise<number | null> {
+  const [data] = await db()
+    .select({
+      stock: productVariants.stock,
+      trackInventory: productVariants.trackInventory,
+      allowBackorder: productVariants.allowBackorder,
+      status: products.status,
+      deletedAt: products.deletedAt,
+    })
+    .from(productVariants)
+    .innerJoin(products, eq(products.id, productVariants.productId))
+    .where(eq(productVariants.id, variantId))
+    .limit(1);
+  if (!data || data.status !== "active" || data.deletedAt) return null;
+  return data.trackInventory && !data.allowBackorder
     ? Math.min(MAX_QUANTITY, data.stock)
     : MAX_QUANTITY;
 }
 
-async function count(supabase: Admin, cartId: string): Promise<number> {
-  const { data } = await supabase.from("cart_items").select("quantity").eq("cart_id", cartId);
-  return (data ?? []).reduce((sum, item) => sum + item.quantity, 0);
+async function count(cartId: string): Promise<number> {
+  const [row] = await db()
+    .select({ n: sql<number>`coalesce(sum(${cartItems.quantity}), 0)::int` })
+    .from(cartItems)
+    .where(eq(cartItems.cartId, cartId));
+  return row?.n ?? 0;
 }
 
 async function guard(): Promise<CartResult | null> {
@@ -48,27 +58,25 @@ export async function addToCart(variantId: string, quantity: number): Promise<Ca
   const qty = quantitySchema.safeParse(quantity);
   if (!variant.success || !qty.success || qty.data === 0) return { ok: false, error: "invalid" };
 
-  const supabase = createSupabaseAdminClient();
-  const limit = await sellable(supabase, variant.data);
+  const limit = await sellable(variant.data);
   if (limit === null || limit === 0) return { ok: false, error: "unavailable" };
 
-  const cartId = await ensureCart();
-  const { data: existing } = await supabase
-    .from("cart_items")
-    .select("quantity")
-    .eq("cart_id", cartId)
-    .eq("variant_id", variant.data)
-    .maybeSingle();
-  const next = Math.min(limit, (existing?.quantity ?? 0) + qty.data);
-  const { error } = await supabase
-    .from("cart_items")
-    .upsert(
-      { cart_id: cartId, variant_id: variant.data, quantity: next },
-      { onConflict: "cart_id,variant_id" },
-    );
-  if (error) return { ok: false, error: "failed" };
-  revalidatePath("/cart");
-  return { ok: true, count: await count(supabase, cartId) };
+  try {
+    const cartId = await ensureCart();
+    // One statement adds to an existing line or creates it, so two clicks cannot race.
+    await db()
+      .insert(cartItems)
+      .values({ cartId, variantId: variant.data, quantity: Math.min(limit, qty.data) })
+      .onConflictDoUpdate({
+        target: [cartItems.cartId, cartItems.variantId],
+        set: { quantity: sql`least(${limit}, ${cartItems.quantity} + ${qty.data})` },
+      });
+    revalidatePath("/cart");
+    return { ok: true, count: await count(cartId) };
+  } catch (error) {
+    console.error("[cart] add failed", error instanceof Error ? error.message : error);
+    return { ok: false, error: "failed" };
+  }
 }
 
 /** Sets a line's quantity; 0 removes it. */
@@ -80,32 +88,30 @@ export async function setCartQuantity(variantId: string, quantity: number): Prom
   const token = await readCartToken();
   if (!variant.success || !qty.success || !token) return { ok: false, error: "invalid" };
 
-  const supabase = createSupabaseAdminClient();
-  const { data: cart } = await supabase
-    .from("carts")
-    .select("id")
-    .eq("token", token)
-    .eq("status", "open")
-    .maybeSingle();
-  if (!cart) return { ok: false, error: "invalid" };
+  try {
+    const [cart] = await db()
+      .select({ id: carts.id })
+      .from(carts)
+      .where(and(eq(carts.token, token), eq(carts.status, "open")))
+      .limit(1);
+    if (!cart) return { ok: false, error: "invalid" };
 
-  if (qty.data === 0) {
-    const { error } = await supabase
-      .from("cart_items")
-      .delete()
-      .eq("cart_id", cart.id)
-      .eq("variant_id", variant.data);
-    if (error) return { ok: false, error: "failed" };
-  } else {
-    const limit = (await sellable(supabase, variant.data)) ?? 0;
-    const { error } = await supabase
-      .from("cart_items")
-      .update({ quantity: Math.max(1, Math.min(limit || qty.data, qty.data)) })
-      .eq("cart_id", cart.id)
-      .eq("variant_id", variant.data);
-    if (error) return { ok: false, error: "failed" };
+    if (qty.data === 0) {
+      await db()
+        .delete(cartItems)
+        .where(and(eq(cartItems.cartId, cart.id), eq(cartItems.variantId, variant.data)));
+    } else {
+      const limit = (await sellable(variant.data)) ?? 0;
+      await db()
+        .update(cartItems)
+        .set({ quantity: Math.max(1, Math.min(limit || qty.data, qty.data)) })
+        .where(and(eq(cartItems.cartId, cart.id), eq(cartItems.variantId, variant.data)));
+    }
+    revalidatePath("/cart");
+    revalidatePath("/checkout");
+    return { ok: true, count: await count(cart.id) };
+  } catch (error) {
+    console.error("[cart] update failed", error instanceof Error ? error.message : error);
+    return { ok: false, error: "failed" };
   }
-  revalidatePath("/cart");
-  revalidatePath("/checkout");
-  return { ok: true, count: await count(supabase, cart.id) };
 }

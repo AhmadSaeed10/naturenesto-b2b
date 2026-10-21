@@ -15,8 +15,9 @@ import {
   socialsSchema,
 } from "@/lib/admin/settings-schema";
 import { loadSettingsRow } from "@/lib/admin/settings";
-import type { Json, TablesUpdate } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { eq } from "drizzle-orm";
+import { withActor } from "@/lib/db";
+import { siteSettings as siteSettingsTable } from "@/lib/db/schema";
 
 export interface SettingsState {
   status: "idle" | "saved" | "invalid" | "forbidden" | "failed";
@@ -42,13 +43,13 @@ type Values<S extends SettingsSection> = z.output<(typeof settingsSections)[S]>;
 async function buildUpdate(
   section: SettingsSection,
   values: Values<SettingsSection>,
-): Promise<TablesUpdate<"site_settings">> {
+): Promise<Partial<typeof siteSettingsTable.$inferInsert>> {
   const row = await loadSettingsRow();
   switch (section) {
     case "details": {
       const v = values as Values<"details">;
       return {
-        store_name: v.storeName,
+        storeName: v.storeName,
         email: v.email,
         address: v.address,
         legal: v.legal || null,
@@ -62,13 +63,13 @@ async function buildUpdate(
           ...phones,
           whatsapp: { ...phones.whatsapp, display: v.whatsappDisplay, e164: v.whatsappE164 },
           call: { ...phones.call, display: v.callDisplay, e164: v.callE164 },
-        } as Json,
+        },
       };
     }
     case "announcement": {
       const v = values as Values<"announcement">;
       const current = announcementSchema.parse(row?.announcement ?? {});
-      return { announcement: { ...current, message: v.message, enabled: v.enabled } as Json };
+      return { announcement: { ...current, message: v.message, enabled: v.enabled } };
     }
     case "socials": {
       const v = values as Values<"socials">;
@@ -80,7 +81,7 @@ async function buildUpdate(
         // A real link answers the "placeholder URL" review flag, so it is dropped.
         return href === "#" ? { ...existing, platform, label, href } : { platform, label, href };
       });
-      return { socials: socials as Json };
+      return { socials: socials };
     }
     case "seo": {
       const v = values as Values<"seo">;
@@ -90,12 +91,12 @@ async function buildUpdate(
           ...seo,
           home: { ...seo.home, title: v.homeTitle, description: v.homeDescription },
           ogImage: { ...seo.ogImage, alt: v.ogAlt },
-        } as Json,
+        },
       };
     }
     case "logo": {
       const v = values as Values<"logo">;
-      return { logo_media_id: v.logoMediaId || null };
+      return { logoMediaId: v.logoMediaId || null };
     }
   }
 }
@@ -104,7 +105,8 @@ export async function saveSettings(
   _previous: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
-  if (!(await staffWithRole(ACCESS.storeSettings))) return { status: "forbidden" };
+  const actor = await staffWithRole(ACCESS.storeSettings);
+  if (!actor) return { status: "forbidden" };
   const section = formData.get("section");
   if (!isSettingsSection(section)) return { status: "invalid" };
 
@@ -116,12 +118,15 @@ export async function saveSettings(
     };
   }
 
-  const supabase = await createSupabaseServerClient();
   const update = await buildUpdate(section, parsed.data);
-  // site_settings holds one row; RLS lets only owners and admins write it.
-  const { error } = await supabase.from("site_settings").update(update).eq("singleton", true);
-  if (error) {
-    console.error("[settings] save failed", error.message);
+  try {
+    // site_settings holds one row. Owners and admins only (checked above); the audit log
+    // records the actor through withActor.
+    await withActor(actor.id, (tx) =>
+      tx.update(siteSettingsTable).set(update).where(eq(siteSettingsTable.singleton, true)),
+    );
+  } catch (error) {
+    console.error("[settings] save failed", error instanceof Error ? error.message : error);
     return { status: "failed" };
   }
 

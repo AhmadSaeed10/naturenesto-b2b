@@ -7,13 +7,10 @@ The database moves from Supabase to Neon Postgres, on free tiers. This file is t
 | Phase | What | Status |
 | --- | --- | --- |
 | 1. Foundation | Connection, migrations as plain Postgres, seed, behaviour tests, CI | Done |
-| 2. Auth | Staff and customer sign in, invites, roles (Better Auth, emails through Resend) | Next |
-| 3. Data layer | Every read and write in `src/lib` and `src/app/actions` moves from Supabase to Neon | Planned |
-| 4. Media | Uploads and public URLs move off Supabase Storage | Planned |
-| 5. Cleanup | Remove `@supabase/*`, `supabase/`, legacy env vars and docs | Planned |
-| 6. Admin panel | Verify every area on Neon, then orders, customers and dashboard | Planned |
-
-Until phase 3 lands the running app still reads from Supabase. Nothing in phase 1 changes what the storefront or admin shows.
+| 2. Auth and data layer | Better Auth sign in, invites, roles, every read and write on Neon through Drizzle | Done |
+| 3. Media | Direct browser uploads to an S3 compatible bucket (needs a bucket, see below) | Code done, needs bucket |
+| 4. Cleanup | `@supabase/*`, `supabase/`, legacy env vars and docs removed | Done |
+| 5. Admin panel | Orders, customers and dashboard screens | Next |
 
 ## Setup
 
@@ -36,14 +33,33 @@ npm run db:seed      # storefront content from src/content (safe to run twice)
 
 For Vercel, add the same two variables to the project environment. For CI migrations on merge, add `DATABASE_URL_UNPOOLED` as a GitHub Actions secret.
 
+## Sign in
+
+1. Generate a secret and add it to `.env.local` next to the database strings:
+
+```
+BETTER_AUTH_SECRET="<output of: openssl rand -base64 32>"
+BETTER_AUTH_URL="http://localhost:3000"
+```
+
+2. `npm run db:migrate` (creates the `auth_*` tables), then `npm run auth:owner -- you@example.com`.
+3. `npm run dev`, open `/admin/login`, enter that email. With no `RESEND_API_KEY` the sign in link is printed in the terminal where `npm run dev` runs. Open it to sign in.
+
+On Vercel set `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (the live origin) and, for real emails, `RESEND_API_KEY` and `EMAIL_FROM` (a sender on a domain verified in Resend).
+
+## Media storage
+
+Uploads go from the browser straight to an S3 compatible bucket using a short lived signed URL from the server (`src/lib/storage`). Any bucket with public reads works: Neon Object Storage, or Cloudflare R2 (10 GB free). Set `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` and `NEXT_PUBLIC_MEDIA_BASE_URL` (the public URL that serves the bucket). The bucket needs a CORS rule allowing `PUT` with header `Content-Type` from your site origin (and `http://localhost:3000` for development). Until it is configured the Media page shows an upload error and the storefront keeps using image URLs.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `npm run db:check` | Connects with both strings, and with the app driver (`@neondatabase/serverless`) on Neon |
+| `npm run db:check` | Connects with both strings and shows host, version and migration count |
 | `npm run db:migrate` | Applies pending migrations. `-- --status` lists applied and pending without changing anything |
 | `npm run db:seed` | Applies `db/seed.sql` |
 | `npm run db:smoke` | Behaviour checks in a rolled back transaction. Local databases only unless `--allow-remote` |
+| `npm run auth:owner -- email [role]` | Invites the first staff member (default role owner) |
 | `npm run seed:generate` | Rebuilds `db/seed.sql` from `src/content` |
 
 ## Migrations
@@ -53,9 +69,9 @@ Plain SQL files in `db/migrations`, named `0001_name.sql`. Each file runs in its
 The files are the old `supabase/migrations` ported to plain Postgres. What was dropped, and why:
 
 - Row level security, policies, grants and Supabase roles (`anon`, `authenticated`, `service_role`). Neon has one application role.
-- `auth.users` foreign keys. The columns remain (`profiles.id`, `created_by`, `actor_id`, `customers.user_id`) as plain uuids. Phase 2 adds the foreign keys once the auth tables exist.
+- `auth.users` foreign keys. Migration `0011_auth.sql` adds the Better Auth tables and points `profiles.id`, `created_by`, `actor_id` and `customers.user_id` at `auth_user`.
 - The `storage.*` bucket and policies. Phase 4 replaces them.
-- The `on_auth_user_created` trigger. Linking an invite to a profile moves into the auth layer in phase 2. The `staff_invites` table stays.
+- The `on_auth_user_created` trigger came back in `0011_auth.sql`, on `auth_user`: a new login gets a profile, and a pending staff invite decides its role.
 - `page_sections.draft`, which was added and dropped again. Drafts live in `page_section_drafts`.
 
 ## Authorisation now lives in server code

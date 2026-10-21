@@ -1,6 +1,6 @@
 import "server-only";
-import type { Tables } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { siteSettings } from "@/lib/db/schema";
 import {
   SOCIAL_PLATFORMS,
   type SettingsSection,
@@ -10,12 +10,12 @@ import {
   socialsSchema,
 } from "./settings-schema";
 
-export type SettingsRow = Tables<"site_settings">;
+export type SettingsRow = typeof siteSettings.$inferSelect;
 
 export async function loadSettingsRow(): Promise<SettingsRow | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.from("site_settings").select("*").maybeSingle();
-  return data;
+  // Admin pages only: callers are behind requireStaff in the admin layout.
+  const [row] = await db().select().from(siteSettings).limit(1);
+  return row ?? null;
 }
 
 /** Current values per form section, flattened to the form field names. */
@@ -33,7 +33,7 @@ export function settingsFormValues(
 
   return {
     details: {
-      storeName: row?.store_name ?? "",
+      storeName: row?.storeName ?? "",
       email: row?.email ?? "",
       address: row?.address ?? "",
       legal: row?.legal ?? "",
@@ -51,6 +51,6 @@ export function settingsFormValues(
       homeDescription: seo.home.description,
       ogAlt: seo.ogImage.alt,
     },
-    logo: { logoMediaId: row?.logo_media_id ?? "" },
+    logo: { logoMediaId: row?.logoMediaId ?? "" },
   };
 }

@@ -55,6 +55,13 @@ async function expectError(
 const actAs = (client: Client, userId: string | null) =>
   client.query("select set_config('app.user_id', $1, true)", [userId ?? ""]);
 
+/** A login (auth_user) plus its profile, which the on_auth_user_created trigger creates. */
+const createLogin = (client: Client, id: string, email: string) =>
+  client.query(
+    "insert into public.auth_user (id, name, email, email_verified) values ($1, $2, $3, true)",
+    [id, email.split("@")[0], email],
+  );
+
 async function run(client: Client): Promise<void> {
   const owner = randomUUID();
   const editor = randomUUID();
@@ -104,12 +111,36 @@ async function run(client: Client): Promise<void> {
     assert.ok(Number(rows[0]?.sections) > 0);
   });
 
-  await check("audit: writes record the acting user and role", async () => {
+  await check("auth: a new login gets a profile, and a staff invite decides its role", async () => {
     await actAs(client, null);
     await client.query(
-      "insert into public.profiles (id, email, role) values ($1, 'owner@test.local', 'owner')",
-      [owner],
+      "insert into public.staff_invites (email, role) values ('Invited@Test.local', 'editor')",
     );
+    const invited = randomUUID();
+    await createLogin(client, invited, "invited@test.local");
+    const profile = await client.query<{ role: string | null }>(
+      "select role from public.profiles where id = $1",
+      [invited],
+    );
+    assert.equal(profile.rows[0]?.role, "editor");
+    const accepted = await client.query(
+      "select 1 from public.staff_invites where lower(email) = 'invited@test.local' and accepted_at is not null",
+    );
+    assert.equal(accepted.rowCount, 1, "the invite is marked accepted");
+
+    const plain = randomUUID();
+    await createLogin(client, plain, "customer@test.local");
+    const customer = await client.query<{ role: string | null }>(
+      "select role from public.profiles where id = $1",
+      [plain],
+    );
+    assert.equal(customer.rows[0]?.role, null, "a customer login has no staff role");
+  });
+
+  await check("audit: writes record the acting user and role", async () => {
+    await actAs(client, null);
+    await createLogin(client, owner, "owner@test.local");
+    await client.query("update public.profiles set role = 'owner' where id = $1", [owner]);
     await actAs(client, owner);
     await client.query("update public.site_settings set store_name = store_name || ' (smoke)'");
     const { rows } = await client.query<{ actor_id: string; actor_role: string }>(
@@ -122,14 +153,10 @@ async function run(client: Client): Promise<void> {
 
   await check("roles: the guard blocks self promotion and admins touching owners", async () => {
     await actAs(client, null); // trusted server maintenance
-    await client.query(
-      "insert into public.profiles (id, email, role) values ($1, 'editor@test.local', 'editor')",
-      [editor],
-    );
-    await client.query(
-      "insert into public.profiles (id, email, role) values ($1, 'admin@test.local', 'admin')",
-      [admin],
-    );
+    await createLogin(client, editor, "editor@test.local");
+    await createLogin(client, admin, "admin@test.local");
+    await client.query("update public.profiles set role = 'editor' where id = $1", [editor]);
+    await client.query("update public.profiles set role = 'admin' where id = $1", [admin]);
 
     await actAs(client, editor);
     await expectError(client, "42501", "update public.profiles set role = 'admin' where id = $1", [

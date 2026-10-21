@@ -3,12 +3,39 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ACCESS, staffWithRole } from "@/lib/auth/staff";
-import { MEDIA_BUCKET } from "@/lib/media";
-import { MEDIA_MAX_BYTES, MEDIA_TEXT_MAX, MEDIA_TYPES } from "@/lib/media-rules";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { eq, sql } from "drizzle-orm";
+import { db, withActor } from "@/lib/db";
+import { mediaAssets } from "@/lib/db/schema";
+import { MEDIA_EXTENSIONS, MEDIA_MAX_BYTES, MEDIA_TEXT_MAX, MEDIA_TYPES } from "@/lib/media-rules";
+import { deleteObject, signedUploadUrl, storageConfigured } from "@/lib/storage";
 
 export type MediaActionResult =
   { ok: true } | { ok: false; error: "invalid" | "forbidden" | "in_use" | "failed" };
+
+export type UploadTargetResult =
+  | { ok: true; url: string; path: string }
+  | { ok: false; error: "invalid" | "forbidden" | "notConfigured" };
+
+const targetSchema = z.object({
+  mimeType: z.enum(MEDIA_TYPES),
+  sizeBytes: z.number().int().positive().max(MEDIA_MAX_BYTES),
+});
+
+/** Gives the browser a short lived signed URL to upload one image straight to the bucket. */
+export async function createUploadTarget(
+  input: z.input<typeof targetSchema>,
+): Promise<UploadTargetResult> {
+  if (!(await staffWithRole(ACCESS.media))) return { ok: false, error: "forbidden" };
+  const parsed = targetSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+  if (!storageConfigured()) return { ok: false, error: "notConfigured" };
+
+  const now = new Date();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const path = `${now.getUTCFullYear()}/${month}/${crypto.randomUUID()}.${MEDIA_EXTENSIONS[parsed.data.mimeType]}`;
+  const url = signedUploadUrl(path, parsed.data.mimeType);
+  return url ? { ok: true, url, path } : { ok: false, error: "notConfigured" };
+}
 
 const MEDIA_PATH = "/admin/media";
 
@@ -34,28 +61,31 @@ const createSchema = details.and(
 
 export type CreateMediaInput = z.input<typeof createSchema>;
 
-/** Records an image the browser has already uploaded to the bucket under the staff session. */
+/** Records an image the browser has already uploaded to the bucket. */
 export async function createMediaAsset(input: CreateMediaInput): Promise<MediaActionResult> {
-  if (!(await staffWithRole(ACCESS.media))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.media);
+  if (!actor) return { ok: false, error: "forbidden" };
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid" };
   const value = parsed.data;
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("media_assets").insert({
-    storage_path: value.storagePath,
-    mime_type: value.mimeType,
-    width: value.width,
-    height: value.height,
-    size_bytes: value.sizeBytes,
-    title: value.title || null,
-    alt: value.decorative ? "" : value.alt,
-    decorative: value.decorative,
-  });
-  if (error) {
-    console.error("[media] insert failed", error.message);
+  try {
+    await withActor(actor.id, (tx) =>
+      tx.insert(mediaAssets).values({
+        storagePath: value.storagePath,
+        mimeType: value.mimeType,
+        width: value.width,
+        height: value.height,
+        sizeBytes: value.sizeBytes,
+        title: value.title || null,
+        alt: value.decorative ? "" : value.alt,
+        decorative: value.decorative,
+      }),
+    );
+  } catch (error) {
+    console.error("[media] insert failed", error instanceof Error ? error.message : error);
     // Do not leave an orphaned file behind.
-    await supabase.storage.from(MEDIA_BUCKET).remove([value.storagePath]);
+    await deleteObject(value.storagePath);
     return { ok: false, error: "failed" };
   }
   revalidatePath(MEDIA_PATH);
@@ -68,7 +98,8 @@ export async function updateMediaAsset(
   _previous: MediaActionResult | null,
   formData: FormData,
 ): Promise<MediaActionResult> {
-  if (!(await staffWithRole(ACCESS.media))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.media);
+  if (!actor) return { ok: false, error: "forbidden" };
   const parsed = updateSchema.safeParse({
     id: formData.get("id"),
     title: formData.get("title") ?? undefined,
@@ -78,35 +109,49 @@ export async function updateMediaAsset(
   if (!parsed.success) return { ok: false, error: "invalid" };
   const { id, title, alt, decorative } = parsed.data;
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("media_assets")
-    .update({ title: title || null, alt: decorative ? "" : alt, decorative })
-    .eq("id", id);
-  if (error) return { ok: false, error: "failed" };
+  try {
+    await withActor(actor.id, (tx) =>
+      tx
+        .update(mediaAssets)
+        .set({ title: title || null, alt: decorative ? "" : alt, decorative })
+        .where(eq(mediaAssets.id, id)),
+    );
+  } catch {
+    return { ok: false, error: "failed" };
+  }
   revalidatePath(MEDIA_PATH);
   return { ok: true };
 }
 
 export async function deleteMediaAsset(id: string): Promise<MediaActionResult> {
-  if (!(await staffWithRole(ACCESS.media))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.media);
+  if (!actor) return { ok: false, error: "forbidden" };
   const parsed = z.uuid().safeParse(id);
   if (!parsed.success) return { ok: false, error: "invalid" };
 
-  const supabase = await createSupabaseServerClient();
-  const [{ data: usage }, { data: asset }] = await Promise.all([
-    supabase.rpc("media_usage", { p_media_ids: [parsed.data] }),
-    supabase.from("media_assets").select("storage_path").eq("id", parsed.data).maybeSingle(),
-  ]);
+  const [asset] = await db()
+    .select({ storagePath: mediaAssets.storagePath })
+    .from(mediaAssets)
+    .where(eq(mediaAssets.id, parsed.data))
+    .limit(1);
   if (!asset) return { ok: false, error: "failed" };
-  if (Number(usage?.[0]?.uses ?? 0) > 0) return { ok: false, error: "in_use" };
+  const usage = await db().execute<{ uses: string }>(
+    sql`select uses from public.media_usage(array[${parsed.data}]::uuid[])`,
+  );
+  if (Number(usage.rows[0]?.uses ?? 0) > 0) return { ok: false, error: "in_use" };
 
-  const { error } = await supabase.from("media_assets").delete().eq("id", parsed.data);
-  // A foreign key still guards against a reference added since the check.
-  if (error) return { ok: false, error: error.code === "23503" ? "in_use" : "failed" };
-  if (asset.storage_path) {
-    await supabase.storage.from(MEDIA_BUCKET).remove([asset.storage_path]);
+  try {
+    await withActor(actor.id, (tx) =>
+      tx.delete(mediaAssets).where(eq(mediaAssets.id, parsed.data)),
+    );
+  } catch (error) {
+    // A foreign key still guards against a reference added since the check.
+    return {
+      ok: false,
+      error: (error as { code?: string }).code === "23503" ? "in_use" : "failed",
+    };
   }
+  if (asset.storagePath) await deleteObject(asset.storagePath);
   revalidatePath(MEDIA_PATH);
   return { ok: true };
 }

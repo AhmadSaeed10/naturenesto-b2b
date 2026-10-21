@@ -10,9 +10,9 @@ import {
   readCartToken,
 } from "@/lib/commerce/cart";
 import { RATE_LIMITS, clientIp, withinRateLimit } from "@/lib/rate-limit";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { supabasePublicEnv } from "@/lib/supabase/env";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { sql } from "drizzle-orm";
+import { getSessionUser } from "@/lib/auth/session";
+import { db } from "@/lib/db";
 
 const code = z.string().trim().max(32);
 const city = z.string().trim().max(120);
@@ -74,13 +74,6 @@ const checkoutSchema = z.object({
 
 const FIELDS = Object.keys(checkoutSchema.shape) as (keyof typeof checkoutSchema.shape)[];
 
-async function signedInUserId(): Promise<string | null> {
-  if (!supabasePublicEnv()) return null;
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getClaims();
-  return data?.claims.sub ?? null;
-}
-
 export async function placeOrder(
   _previous: CheckoutState,
   formData: FormData,
@@ -105,38 +98,44 @@ export async function placeOrder(
   if (!cartToken) return { status: "error", error: "cart_empty", values };
 
   const v = parsed.data;
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase.rpc("place_order", {
-    p: {
-      cart_token: cartToken,
-      user_id: (await signedInUserId()) ?? "",
-      email: v.email,
-      phone: v.phone,
+  const request = {
+    cart_token: cartToken,
+    user_id: (await getSessionUser())?.id ?? "",
+    email: v.email,
+    phone: v.phone,
+    full_name: v.fullName,
+    address: {
       full_name: v.fullName,
-      address: {
-        full_name: v.fullName,
-        phone: v.phone,
-        line1: v.line1,
-        line2: v.line2 || null,
-        area: v.area || null,
-        city: v.city,
-        province: v.province || null,
-        postal_code: v.postalCode || null,
-        country: "PK",
-      },
-      notes: v.notes,
-      discount_code: v.discountCode,
-      payment_method: v.paymentMethod,
+      phone: v.phone,
+      line1: v.line1,
+      line2: v.line2 || null,
+      area: v.area || null,
+      city: v.city,
+      province: v.province || null,
+      postal_code: v.postalCode || null,
+      country: "PK",
     },
-  });
+    notes: v.notes,
+    discount_code: v.discountCode,
+    payment_method: v.paymentMethod,
+  };
 
-  if (error) {
-    const known = PLACE_ERRORS.find((key) => error.message === key);
-    if (!known) console.error("[checkout] place_order failed", error.message);
+  let data: unknown;
+  try {
+    // place_order prices, locks stock and writes the order in one database transaction. It
+    // runs as the server (no actor), and reports business errors by message.
+    const result = await db().execute<{ o: unknown }>(
+      sql`select public.place_order(${JSON.stringify(request)}::jsonb) as o`,
+    );
+    data = result.rows[0]?.o;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const known = PLACE_ERRORS.find((key) => message === key || message.endsWith(key));
+    if (!known) console.error("[checkout] place_order failed", message);
     return { status: "error", error: known ?? "failed", values };
   }
 
-  const placed = z.object({ number: z.number(), access_token: z.uuid() }).safeParse(data);
+  const placed = z.object({ number: z.coerce.number(), access_token: z.uuid() }).safeParse(data);
   if (!placed.success) return { status: "error", error: "failed", values };
   await clearCartCookie();
   redirect(`/orders/${placed.data.number}?t=${placed.data.access_token}`);

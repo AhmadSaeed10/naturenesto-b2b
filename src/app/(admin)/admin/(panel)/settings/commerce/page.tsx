@@ -7,36 +7,28 @@ import {
 } from "@/components/admin/settings/CommerceForms";
 import { admin } from "@/content/admin";
 import { ACCESS, requireStaff } from "@/lib/auth/staff";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { asc } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { paymentMethods, shippingRates, shippingZones, taxSettings } from "@/lib/db/schema";
 
 const copy = admin.settings.commerce;
 
 export default async function CommerceSettingsPage() {
   await requireStaff(ACCESS.storeSettings);
-  const supabase = await createSupabaseServerClient();
-  const [{ data: zones }, { data: tax }, { data: methods }] = await Promise.all([
-    supabase
-      .from("shipping_zones")
-      .select(
-        "id, name, cities, is_default, position, shipping_rates (id, price, free_over, active, created_at)",
-      )
-      .order("position"),
-    supabase.from("tax_settings").select("label, rate_bps, prices_include_tax").maybeSingle(),
-    supabase
-      .from("payment_methods")
-      .select("id, code, name, instructions, enabled")
-      .order("position"),
+  const [zones, rates, [tax], methods] = await Promise.all([
+    db().select().from(shippingZones).orderBy(asc(shippingZones.position)),
+    db().select().from(shippingRates).orderBy(asc(shippingRates.createdAt)),
+    db().select().from(taxSettings).limit(1),
+    db().select().from(paymentMethods).orderBy(asc(paymentMethods.position)),
   ]);
 
   return (
     <div className="flex flex-col gap-6">
       <p className="text-sm text-ink-muted">{copy.intro}</p>
       <AdminCard title={copy.zones.title} description={copy.zones.intro}>
-        {(zones ?? []).map((zone) => {
-          // The admin edits one rate per zone; extra rates only come from direct imports.
-          const rate = [...zone.shipping_rates].sort((a, b) =>
-            a.created_at.localeCompare(b.created_at),
-          )[0];
+        {zones.map((zone) => {
+          // The admin edits one rate per zone (the oldest); extra rates only come from direct imports.
+          const rate = rates.find((r) => r.zoneId === zone.id);
           return (
             <ZoneForm
               key={`${zone.id}-${rate?.id ?? "none"}`}
@@ -44,12 +36,12 @@ export default async function CommerceSettingsPage() {
                 id: zone.id,
                 name: zone.name,
                 cities: zone.cities,
-                isDefault: zone.is_default,
+                isDefault: zone.isDefault,
                 rate: rate
                   ? {
                       id: rate.id,
                       price: rate.price,
-                      freeOver: rate.free_over,
+                      freeOver: rate.freeOver,
                       active: rate.active,
                     }
                   : null,
@@ -64,12 +56,12 @@ export default async function CommerceSettingsPage() {
       {tax ? (
         <AdminCard title={copy.tax.title}>
           <TaxForm
-            tax={{ label: tax.label, rateBps: tax.rate_bps, included: tax.prices_include_tax }}
+            tax={{ label: tax.label, rateBps: tax.rateBps, included: tax.pricesIncludeTax }}
           />
         </AdminCard>
       ) : null}
       <AdminCard title={copy.payments.title} description={copy.payments.intro}>
-        {(methods ?? []).map((method) => (
+        {methods.map((method) => (
           <PaymentMethodForm key={method.id} method={method} />
         ))}
       </AdminCard>

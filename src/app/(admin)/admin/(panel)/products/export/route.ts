@@ -1,39 +1,35 @@
 import { NextResponse } from "next/server";
 import { PRODUCT_CSV_COLUMNS } from "@/lib/admin/product-csv";
+import type { Json } from "@/lib/db/enums";
 import { descriptionText } from "@/lib/admin/product-schema";
 import { ACCESS, staffWithRole } from "@/lib/auth/staff";
 import { toCsv } from "@/lib/csv";
 import { paisaToRupees } from "@/lib/money";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { asc, isNull } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { productOptions, products, productVariants } from "@/lib/db/schema";
 
 /** Whole catalogue (not deleted) as CSV, one row per variant. */
 export async function GET() {
   if (!(await staffWithRole(ACCESS.catalog))) {
     return new NextResponse(null, { status: 403 });
   }
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("products")
-    .select(
-      `handle, title, status, vendor, product_type, tags, description, seo_title, seo_description,
-       product_options (name, position),
-       product_variants (title, sku, price, compare_at_price, cost, weight_g, stock,
-         track_inventory, allow_backorder, option_values, position)`,
-    )
-    .is("deleted_at", null)
-    .order("handle");
-  if (error) return new NextResponse(null, { status: 500 });
+  const [productRows, optionRows, variantRows] = await Promise.all([
+    db().select().from(products).where(isNull(products.deletedAt)).orderBy(asc(products.handle)),
+    db().select().from(productOptions).orderBy(asc(productOptions.position)),
+    db().select().from(productVariants).orderBy(asc(productVariants.position)),
+  ]);
 
-  const rows = data.flatMap((product) => {
-    const options = [...product.product_options].sort((a, b) => a.position - b.position);
-    return [...product.product_variants]
-      .sort((a, b) => a.position - b.position)
+  const rows = productRows.flatMap((product) => {
+    const options = optionRows.filter((o) => o.productId === product.id);
+    return variantRows
+      .filter((v) => v.productId === product.id)
       .map((variant, index) => {
         const values =
-          variant.option_values &&
-          typeof variant.option_values === "object" &&
-          !Array.isArray(variant.option_values)
-            ? variant.option_values
+          variant.optionValues &&
+          typeof variant.optionValues === "object" &&
+          !Array.isArray(variant.optionValues)
+            ? (variant.optionValues as Record<string, unknown>)
             : {};
         const optionCells = [0, 1, 2].flatMap((i) => {
           const option = options[i];
@@ -47,21 +43,21 @@ export async function GET() {
           first ? product.title : "",
           first ? product.status : "",
           first ? product.vendor : "",
-          first ? product.product_type : "",
+          first ? product.productType : "",
           first ? product.tags.join(", ") : "",
-          first ? descriptionText(product.description) : "",
-          first ? product.seo_title : "",
-          first ? product.seo_description : "",
+          first ? descriptionText(product.description as Json) : "",
+          first ? product.seoTitle : "",
+          first ? product.seoDescription : "",
           ...optionCells,
           variant.title,
           variant.sku,
           paisaToRupees(variant.price),
-          paisaToRupees(variant.compare_at_price),
+          paisaToRupees(variant.compareAtPrice),
           paisaToRupees(variant.cost),
-          variant.weight_g,
+          variant.weightG,
           variant.stock,
-          variant.track_inventory,
-          variant.allow_backorder,
+          variant.trackInventory,
+          variant.allowBackorder,
         ];
       });
   });

@@ -1,9 +1,12 @@
 import "server-only";
 import { z } from "zod";
 import { storedImageUrl } from "@/lib/media";
-import type { Enums, Json } from "@/lib/supabase/database.types";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { and, asc, eq, type SQL } from "drizzle-orm";
+import { getSessionUser } from "@/lib/auth/session";
+import { getStaff } from "@/lib/auth/staff";
+import { db } from "@/lib/db";
+import type { Enums } from "@/lib/db/enums";
+import { customers, fulfillments, orderItems, orders, orderStatusHistory } from "@/lib/db/schema";
 
 export interface OrderView {
   number: number;
@@ -39,116 +42,105 @@ export interface OrderView {
   }[];
 }
 
-const ORDER_SELECT = `number, status, payment_status, payment_method, placed_at, full_name, email, phone,
-  shipping_address, notes, subtotal, discount_total, discount_code, shipping_total, tax_total, total,
-  order_items (title, variant_title, quantity, unit_price, line_total, image_url, created_at),
-  order_status_history (status, note, created_at),
-  fulfillments (carrier, tracking_number, tracking_url, shipped_at)`;
+type OrderRow = typeof orders.$inferSelect;
+type ItemRow = typeof orderItems.$inferSelect;
+type HistoryRow = typeof orderStatusHistory.$inferSelect;
+type FulfillmentRow = typeof fulfillments.$inferSelect;
 
-type OrderRow = {
-  number: number;
-  status: Enums<"order_status">;
-  payment_status: Enums<"payment_status">;
-  payment_method: string;
-  placed_at: string;
-  full_name: string;
-  email: string;
-  phone: string;
-  shipping_address: Json;
-  notes: string | null;
-  subtotal: number;
-  discount_total: number;
-  discount_code: string | null;
-  shipping_total: number;
-  tax_total: number;
-  total: number;
-  order_items: {
-    title: string;
-    variant_title: string | null;
-    quantity: number;
-    unit_price: number;
-    line_total: number;
-    image_url: string | null;
-    created_at: string;
-  }[];
-  order_status_history: { status: string; note: string | null; created_at: string }[];
-  fulfillments: {
-    carrier: string | null;
-    tracking_number: string | null;
-    tracking_url: string | null;
-    shipped_at: string | null;
-  }[];
-};
-
-function toView(row: OrderRow): OrderView {
+function toView(
+  row: OrderRow,
+  items: ItemRow[],
+  history: HistoryRow[],
+  shipments: FulfillmentRow[],
+): OrderView {
   const address =
-    row.shipping_address &&
-    typeof row.shipping_address === "object" &&
-    !Array.isArray(row.shipping_address)
+    row.shippingAddress &&
+    typeof row.shippingAddress === "object" &&
+    !Array.isArray(row.shippingAddress)
       ? Object.fromEntries(
-          Object.entries(row.shipping_address).filter(
+          Object.entries(row.shippingAddress).filter(
             (e): e is [string, string] => typeof e[1] === "string",
           ),
         )
       : {};
   return {
-    number: row.number,
+    number: Number(row.number),
     status: row.status,
-    paymentStatus: row.payment_status,
-    paymentMethod: row.payment_method,
-    placedAt: row.placed_at,
-    fullName: row.full_name,
+    paymentStatus: row.paymentStatus,
+    paymentMethod: row.paymentMethod,
+    placedAt: row.placedAt.toISOString(),
+    fullName: row.fullName,
     email: row.email,
     phone: row.phone,
     address,
     notes: row.notes,
     subtotal: row.subtotal,
-    discountTotal: row.discount_total,
-    discountCode: row.discount_code,
-    shippingTotal: row.shipping_total,
-    taxTotal: row.tax_total,
+    discountTotal: row.discountTotal,
+    discountCode: row.discountCode,
+    shippingTotal: row.shippingTotal,
+    taxTotal: row.taxTotal,
     total: row.total,
-    items: [...row.order_items]
-      .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .map((item) => ({
-        title: item.title,
-        variantTitle: item.variant_title,
-        quantity: item.quantity,
-        unitPrice: item.unit_price,
-        lineTotal: item.line_total,
-        image: storedImageUrl(item.image_url),
-      })),
-    history: [...row.order_status_history]
-      .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .map((h) => ({ status: h.status, note: h.note, at: h.created_at })),
-    fulfillments: row.fulfillments.map((f) => ({
+    items: items.map((item) => ({
+      title: item.title,
+      variantTitle: item.variantTitle,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      image: storedImageUrl(item.imageUrl),
+    })),
+    history: history.map((h) => ({
+      status: h.status,
+      note: h.note,
+      at: h.createdAt.toISOString(),
+    })),
+    fulfillments: shipments.map((f) => ({
       carrier: f.carrier,
-      trackingNumber: f.tracking_number,
-      trackingUrl: f.tracking_url,
-      shippedAt: f.shipped_at,
+      trackingNumber: f.trackingNumber,
+      trackingUrl: f.trackingUrl,
+      shippedAt: f.shippedAt?.toISOString() ?? null,
     })),
   };
 }
 
+async function load(where: SQL | undefined): Promise<OrderView | null> {
+  const [row] = await db().select().from(orders).where(where).limit(1);
+  if (!row) return null;
+  const [items, history, shipments] = await Promise.all([
+    db()
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, row.id))
+      .orderBy(asc(orderItems.createdAt)),
+    db()
+      .select()
+      .from(orderStatusHistory)
+      .where(eq(orderStatusHistory.orderId, row.id))
+      .orderBy(asc(orderStatusHistory.createdAt)),
+    db().select().from(fulfillments).where(eq(fulfillments.orderId, row.id)),
+  ]);
+  return toView(row, items, history, shipments);
+}
+
 /**
- * An order by number, for its page. A guest needs the secret token from their link;
- * a signed in customer can open their own orders without it (RLS checks ownership).
+ * An order by number, for its page. A guest needs the secret token from their link; a signed
+ * in customer can open their own orders, and order staff can open any (checked here, in code).
  */
 export async function getOrder(number: number, token: string | null): Promise<OrderView | null> {
   if (token && z.uuid().safeParse(token).success) {
-    const { data } = await createSupabaseAdminClient()
-      .from("orders")
-      .select(ORDER_SELECT)
-      .eq("number", number)
-      .eq("access_token", token)
-      .maybeSingle();
-    if (data) return toView(data as OrderRow);
+    const byToken = await load(and(eq(orders.number, number), eq(orders.accessToken, token)));
+    if (byToken) return byToken;
   }
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("orders")
-    .select(ORDER_SELECT)
-    .eq("number", number)
-    .maybeSingle();
-  return data ? toView(data as OrderRow) : null;
+  const staff = await getStaff();
+  if (staff && ["owner", "admin", "support"].includes(staff.role)) {
+    return load(eq(orders.number, number));
+  }
+  const user = await getSessionUser();
+  if (!user) return null;
+  const [mine] = await db()
+    .select({ id: customers.id })
+    .from(customers)
+    .where(eq(customers.userId, user.id))
+    .limit(1);
+  if (!mine) return null;
+  return load(and(eq(orders.number, number), eq(orders.customerId, mine.id)));
 }

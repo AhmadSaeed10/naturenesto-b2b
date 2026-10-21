@@ -6,7 +6,9 @@ import { SORT_ORDERS } from "@/lib/admin/collections-shared";
 import { cleanSearch } from "@/lib/admin/media";
 import { ACCESS, staffWithRole } from "@/lib/auth/staff";
 import { HANDLE_PATTERN, toTag } from "@/lib/handle";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { and, asc, eq, ilike, isNull, notInArray, or, sql } from "drizzle-orm";
+import { db, withActor } from "@/lib/db";
+import { categories, collectionProducts, collections, products } from "@/lib/db/schema";
 
 export type CollectionResult =
   | { ok: true; id: string }
@@ -53,7 +55,8 @@ function refresh(id?: string) {
 }
 
 export async function saveCollection(input: CollectionInput): Promise<CollectionResult> {
-  if (!(await staffWithRole(ACCESS.catalog))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.catalog);
+  if (!actor) return { ok: false, error: "forbidden" };
   const parsed = collectionSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -71,48 +74,59 @@ export async function saveCollection(input: CollectionInput): Promise<Collection
     description: value.description || null,
     kind: value.kind,
     rules: value.kind === "automatic" ? value.rules : [],
-    sort_order: value.sortOrder,
+    sortOrder: value.sortOrder,
     status: value.published ? ("published" as const) : ("draft" as const),
-    image_id: value.imageId || null,
-    seo_title: value.seoTitle || null,
-    seo_description: value.seoDescription || null,
+    imageId: value.imageId || null,
+    seoTitle: value.seoTitle || null,
+    seoDescription: value.seoDescription || null,
   };
 
-  const supabase = await createSupabaseServerClient();
-  const saved = value.id
-    ? await supabase.from("collections").update(row).eq("id", value.id).select("id").single()
-    : await supabase.from("collections").insert(row).select("id").single();
-  if (saved.error) {
-    if (saved.error.code === "23505") return { ok: false, error: "handleTaken" };
-    console.error("[collections] save failed", saved.error.message);
+  let id: string;
+  try {
+    id = await withActor(actor.id, async (tx) => {
+      const [saved] = value.id
+        ? await tx
+            .update(collections)
+            .set(row)
+            .where(eq(collections.id, value.id))
+            .returning({ id: collections.id })
+        : await tx.insert(collections).values(row).returning({ id: collections.id });
+      if (!saved) throw new Error("collection not found");
+      if (value.kind === "manual") {
+        // Membership is small and order matters, so it is rewritten: drop removed products,
+        // then upsert the rest with their new positions.
+        await tx
+          .delete(collectionProducts)
+          .where(
+            value.productIds.length
+              ? and(
+                  eq(collectionProducts.collectionId, saved.id),
+                  notInArray(collectionProducts.productId, value.productIds),
+                )
+              : eq(collectionProducts.collectionId, saved.id),
+          );
+        if (value.productIds.length) {
+          await tx
+            .insert(collectionProducts)
+            .values(
+              value.productIds.map((productId, position) => ({
+                collectionId: saved.id,
+                productId,
+                position,
+              })),
+            )
+            .onConflictDoUpdate({
+              target: [collectionProducts.collectionId, collectionProducts.productId],
+              set: { position: sql`excluded.position` },
+            });
+        }
+      }
+      return saved.id;
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") return { ok: false, error: "handleTaken" };
+    console.error("[collections] save failed", error instanceof Error ? error.message : error);
     return { ok: false, error: "failed" };
-  }
-  const id = saved.data.id;
-
-  if (value.kind === "manual") {
-    // Membership is small and order matters, so it is rewritten: drop removed products,
-    // then upsert the rest with their new positions.
-    const remove = supabase.from("collection_products").delete().eq("collection_id", id);
-    const { error: removeError } = value.productIds.length
-      ? await remove.not("product_id", "in", `(${value.productIds.join(",")})`)
-      : await remove;
-    const { error: upsertError } = value.productIds.length
-      ? await supabase.from("collection_products").upsert(
-          value.productIds.map((productId, position) => ({
-            collection_id: id,
-            product_id: productId,
-            position,
-          })),
-          { onConflict: "collection_id,product_id" },
-        )
-      : { error: null };
-    if (removeError || upsertError) {
-      console.error(
-        "[collections] membership failed",
-        removeError?.message ?? upsertError?.message,
-      );
-      return { ok: false, error: "failed" };
-    }
   }
 
   refresh(id);
@@ -120,12 +134,17 @@ export async function saveCollection(input: CollectionInput): Promise<Collection
 }
 
 export async function deleteCollection(id: string): Promise<{ ok: boolean }> {
-  if (!(await staffWithRole(ACCESS.catalog))) return { ok: false };
+  const actor = await staffWithRole(ACCESS.catalog);
+  if (!actor) return { ok: false };
   const parsed = z.uuid().safeParse(id);
   if (!parsed.success) return { ok: false };
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("collections").delete().eq("id", parsed.data);
-  if (error) return { ok: false };
+  try {
+    await withActor(actor.id, (tx) =>
+      tx.delete(collections).where(eq(collections.id, parsed.data)),
+    );
+  } catch {
+    return { ok: false };
+  }
   refresh();
   return { ok: true };
 }
@@ -141,15 +160,17 @@ export async function searchProducts(query: string): Promise<ProductHit[]> {
   if (!(await staffWithRole(ACCESS.catalog))) return [];
   const term = cleanSearch(query);
   if (!term) return [];
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("products")
-    .select("id, title, handle")
-    .is("deleted_at", null)
-    .or(`title.ilike."%${term}%",handle.ilike."%${term}%"`)
-    .order("title")
+  return db()
+    .select({ id: products.id, title: products.title, handle: products.handle })
+    .from(products)
+    .where(
+      and(
+        isNull(products.deletedAt),
+        or(ilike(products.title, `%${term}%`), ilike(products.handle, `%${term}%`)),
+      ),
+    )
+    .orderBy(asc(products.title))
     .limit(20);
-  return data ?? [];
 }
 
 // Categories ------------------------------------------------------------------------------
@@ -169,7 +190,8 @@ export async function saveCategory(
   _previous: CategoryState,
   formData: FormData,
 ): Promise<CategoryState> {
-  if (!(await staffWithRole(ACCESS.catalog))) return { status: "forbidden" };
+  const actor = await staffWithRole(ACCESS.catalog);
+  if (!actor) return { status: "forbidden" };
   const parsed = categorySchema.safeParse({
     id: formData.get("id") ?? "",
     name: formData.get("name"),
@@ -179,11 +201,12 @@ export async function saveCategory(
   if (!parsed.success) return { status: "invalid" };
   const { id, name, handle, parentId } = parsed.data;
 
-  const supabase = await createSupabaseServerClient();
   if (id && parentId) {
     // Walk up from the new parent; meeting this category means the move would loop.
-    const { data: all } = await supabase.from("categories").select("id, parent_id");
-    const parents = new Map((all ?? []).map((row) => [row.id, row.parent_id]));
+    const all = await db()
+      .select({ id: categories.id, parentId: categories.parentId })
+      .from(categories);
+    const parents = new Map(all.map((row) => [row.id, row.parentId]));
     let cursor: string | null | undefined = parentId;
     for (let guard = 0; cursor && guard < 100; guard += 1) {
       if (cursor === id) return { status: "cycle" };
@@ -191,22 +214,30 @@ export async function saveCategory(
     }
   }
 
-  const row = { name, handle, parent_id: parentId || null };
-  const { error } = id
-    ? await supabase.from("categories").update(row).eq("id", id)
-    : await supabase.from("categories").insert(row);
-  if (error) return { status: error.code === "23505" ? "handleTaken" : "failed" };
+  const row = { name, handle, parentId: parentId || null };
+  try {
+    await withActor(actor.id, (tx) =>
+      id
+        ? tx.update(categories).set(row).where(eq(categories.id, id))
+        : tx.insert(categories).values(row),
+    );
+  } catch (error) {
+    return { status: (error as { code?: string }).code === "23505" ? "handleTaken" : "failed" };
+  }
   revalidatePath("/admin/collections/categories");
   return { status: "saved" };
 }
 
 export async function deleteCategory(id: string): Promise<{ ok: boolean }> {
-  if (!(await staffWithRole(ACCESS.catalog))) return { ok: false };
+  const actor = await staffWithRole(ACCESS.catalog);
+  if (!actor) return { ok: false };
   const parsed = z.uuid().safeParse(id);
   if (!parsed.success) return { ok: false };
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("categories").delete().eq("id", parsed.data);
-  if (error) return { ok: false };
+  try {
+    await withActor(actor.id, (tx) => tx.delete(categories).where(eq(categories.id, parsed.data)));
+  } catch {
+    return { ok: false };
+  }
   revalidatePath("/admin/collections/categories");
   return { ok: true };
 }

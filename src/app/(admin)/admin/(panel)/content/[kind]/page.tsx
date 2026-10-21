@@ -3,11 +3,14 @@ import { notFound } from "next/navigation";
 import { admin } from "@/content/admin";
 import { listDocs } from "@/lib/admin/content";
 import { isDocKind } from "@/lib/admin/content-kinds";
+import { ACCESS, requireStaff } from "@/lib/auth/staff";
 
 const copy = admin.content;
 const DATE = new Intl.DateTimeFormat("en-PK", { dateStyle: "medium", timeZone: "Asia/Karachi" });
 
 export default async function DocListPage({ params }: PageProps<"/admin/content/[kind]">) {
+  // The layout gates the panel too; checking here keeps this page safe on its own.
+  await requireStaff(ACCESS.content);
   const { kind } = await params;
   if (!isDocKind(kind)) notFound();
   const docs = await listDocs(kind);

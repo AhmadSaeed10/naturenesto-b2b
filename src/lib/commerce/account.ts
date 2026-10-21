@@ -1,6 +1,8 @@
 import "server-only";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { getSessionUser } from "@/lib/auth/session";
+import { db } from "@/lib/db";
+import { addresses, customers, orders } from "@/lib/db/schema";
 
 export interface AccountView {
   email: string;
@@ -20,69 +22,82 @@ export interface AccountView {
 /**
  * The signed in customer's account. On first visit their customer record (from guest
  * checkouts with the same, now verified, email) is linked to the login so past orders show.
+ * Everything below is limited to this customer's id: there is no row level security.
  */
 export async function getAccount(): Promise<AccountView | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data: claims } = await supabase.auth.getClaims();
-  const userId = claims?.claims.sub;
-  const email = typeof claims?.claims.email === "string" ? claims.claims.email.toLowerCase() : null;
-  if (!userId || !email) return null;
+  const user = await getSessionUser();
+  if (!user) return null;
+  const { id: userId, email } = user;
 
-  let { data: customer } = await supabase
-    .from("customers")
-    .select("id")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!customer) {
-    const admin = createSupabaseAdminClient();
-    const { data: guest } = await admin
-      .from("customers")
-      .select("id")
-      .ilike("email", email.replace(/[\\%_]/g, "\\$&"))
-      .is("user_id", null)
-      .is("deleted_at", null)
-      .maybeSingle();
-    const linked = guest
-      ? await admin
-          .from("customers")
-          .update({ user_id: userId })
-          .eq("id", guest.id)
-          .select("id")
-          .single()
-      : await admin.from("customers").insert({ user_id: userId, email }).select("id").single();
-    customer = linked.data;
+  const [mine] = await db()
+    .select({ id: customers.id })
+    .from(customers)
+    .where(eq(customers.userId, userId))
+    .limit(1);
+  let customerId = mine?.id;
+
+  if (!customerId) {
+    const [guest] = await db()
+      .select({ id: customers.id })
+      .from(customers)
+      .where(
+        and(
+          sql`lower(${customers.email}) = ${email}`,
+          isNull(customers.userId),
+          isNull(customers.deletedAt),
+        ),
+      )
+      .limit(1);
+    const [linked] = guest
+      ? await db()
+          .update(customers)
+          .set({ userId })
+          .where(eq(customers.id, guest.id))
+          .returning({ id: customers.id })
+      : await db()
+          .insert(customers)
+          .values({ userId, email })
+          .onConflictDoNothing()
+          .returning({ id: customers.id });
+    customerId = linked?.id;
   }
-  if (!customer) return { email, orders: [], addresses: [] };
+  if (!customerId) return { email, orders: [], addresses: [] };
 
-  const [orders, addresses] = await Promise.all([
-    supabase
-      .from("orders")
-      .select("number, total, status, placed_at")
-      .order("placed_at", { ascending: false })
+  const [orderRows, addressRows] = await Promise.all([
+    db()
+      .select({
+        number: orders.number,
+        total: orders.total,
+        status: orders.status,
+        placedAt: orders.placedAt,
+      })
+      .from(orders)
+      .where(eq(orders.customerId, customerId))
+      .orderBy(desc(orders.placedAt))
       .limit(50),
-    supabase
-      .from("addresses")
-      .select("id, full_name, phone, line1, line2, area, city, is_default")
-      .order("is_default", { ascending: false })
-      .order("created_at"),
+    db()
+      .select()
+      .from(addresses)
+      .where(eq(addresses.customerId, customerId))
+      .orderBy(desc(addresses.isDefault), asc(addresses.createdAt)),
   ]);
   return {
     email,
-    orders: (orders.data ?? []).map((o) => ({
-      number: o.number,
-      total: o.total,
+    orders: orderRows.map((o) => ({
+      number: Number(o.number),
+      total: Number(o.total),
       status: o.status,
-      placedAt: o.placed_at,
+      placedAt: o.placedAt.toISOString(),
     })),
-    addresses: (addresses.data ?? []).map((a) => ({
+    addresses: addressRows.map((a) => ({
       id: a.id,
-      fullName: a.full_name,
+      fullName: a.fullName,
       phone: a.phone,
       line1: a.line1,
       line2: a.line2,
       area: a.area,
       city: a.city,
-      isDefault: a.is_default,
+      isDefault: a.isDefault,
     })),
   };
 }

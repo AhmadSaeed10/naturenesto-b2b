@@ -1,37 +1,31 @@
 "use server";
 
+import { and, count, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ACCOUNT_HOME, AUTH_CALLBACK } from "@/lib/auth/paths";
+import { ensureCustomerAccount } from "@/lib/auth/accounts";
+import { ACCOUNT_HOME, ACCOUNT_LOGIN } from "@/lib/auth/paths";
+import { getAuth, isAuthConfigured } from "@/lib/auth/server";
+import { getSessionUser } from "@/lib/auth/session";
+import { db } from "@/lib/db";
+import { addresses, customers } from "@/lib/db/schema";
 import { RATE_LIMITS, clientIp, withinRateLimit } from "@/lib/rate-limit";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { supabasePublicEnv } from "@/lib/supabase/env";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface LinkState {
   status: "idle" | "sent" | "email" | "rateLimited" | "notConfigured";
 }
 
-async function origin(): Promise<string> {
-  const list = await headers();
-  const host = list.get("x-forwarded-host") ?? list.get("host");
-  const proto = list.get("x-forwarded-proto") ?? "https";
-  return host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
-}
-
 /**
- * Emails a customer sign in link. Accounts are created here with the service role, so
- * public sign ups can stay disabled in Supabase Auth. Same answer whether or not the
- * email already has an account.
+ * Emails a customer sign in link. The login is created here, so public sign up stays closed
+ * in Better Auth. Same answer whether or not the email already has an account.
  */
 export async function requestAccountLink(
   _previous: LinkState,
   formData: FormData,
 ): Promise<LinkState> {
-  if (!supabasePublicEnv() || !process.env.SUPABASE_SERVICE_ROLE_KEY)
-    return { status: "notConfigured" };
+  if (!isAuthConfigured()) return { status: "notConfigured" };
   const email = z
     .email()
     .max(320)
@@ -45,36 +39,32 @@ export async function requestAccountLink(
   ]);
   if (!ipOk || !emailOk) return { status: "rateLimited" };
 
-  const admin = createSupabaseAdminClient();
-  const { error: createError } = await admin.auth.admin.createUser({
-    email: email.data,
-    email_confirm: true,
-  });
-  if (createError && !/already/i.test(createError.message)) {
-    console.error("[account] could not create user", createError.message);
-    return { status: "sent" };
+  if (!(await ensureCustomerAccount(email.data))) return { status: "sent" };
+  try {
+    await getAuth().api.signInMagicLink({
+      body: {
+        email: email.data,
+        callbackURL: ACCOUNT_HOME,
+        errorCallbackURL: `${ACCOUNT_LOGIN}?error=callback`,
+      },
+      headers: await headers(),
+    });
+  } catch (error) {
+    console.error("[account] link failed", error instanceof Error ? error.message : error);
   }
-
-  const callback = new URL(AUTH_CALLBACK, await origin());
-  callback.searchParams.set("next", ACCOUNT_HOME);
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithOtp({
-    email: email.data,
-    options: { shouldCreateUser: false, emailRedirectTo: callback.toString() },
-  });
-  if (error) console.error("[account] link failed", error.message);
   return { status: "sent" };
 }
 
 export async function signOutCustomer(): Promise<void> {
-  if (supabasePublicEnv()) {
-    const supabase = await createSupabaseServerClient();
-    await supabase.auth.signOut();
+  if (isAuthConfigured()) {
+    await getAuth()
+      .api.signOut({ headers: await headers() })
+      .catch(() => undefined);
   }
   redirect("/");
 }
 
-// Addresses: written with the customer's own session, so RLS limits them to their rows.
+// Addresses: every query below is limited to the signed in customer's own rows in code.
 
 export interface AddressState {
   status: "idle" | "saved" | "invalid" | "failed";
@@ -96,15 +86,14 @@ const addressSchema = z.object({
 });
 
 async function myCustomerId(): Promise<string | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data: claims } = await supabase.auth.getClaims();
-  if (!claims?.claims.sub) return null;
-  const { data } = await supabase
-    .from("customers")
-    .select("id")
-    .eq("user_id", claims.claims.sub)
-    .maybeSingle();
-  return data?.id ?? null;
+  const user = await getSessionUser();
+  if (!user) return null;
+  const [row] = await db()
+    .select({ id: customers.id })
+    .from(customers)
+    .where(eq(customers.userId, user.id))
+    .limit(1);
+  return row?.id ?? null;
 }
 
 export async function saveAddress(
@@ -124,33 +113,41 @@ export async function saveAddress(
   const customerId = await myCustomerId();
   if (!customerId) return { status: "failed" };
   const v = parsed.data;
-  const supabase = await createSupabaseServerClient();
-  const { count } = await supabase
-    .from("addresses")
-    .select("id", { count: "exact", head: true })
-    .eq("customer_id", customerId);
-  const { error } = await supabase.from("addresses").insert({
-    customer_id: customerId,
-    full_name: v.fullName,
-    phone: v.phone,
-    line1: v.line1,
-    line2: v.line2 || null,
-    area: v.area || null,
-    city: v.city,
-    province: v.province || null,
-    postal_code: v.postalCode || null,
-    // The first address becomes the default.
-    is_default: (count ?? 0) === 0,
-  });
-  if (error) return { status: "failed" };
+  try {
+    await db().transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ n: count() })
+        .from(addresses)
+        .where(eq(addresses.customerId, customerId));
+      await tx.insert(addresses).values({
+        customerId,
+        fullName: v.fullName,
+        phone: v.phone,
+        line1: v.line1,
+        line2: v.line2 || null,
+        area: v.area || null,
+        city: v.city,
+        province: v.province || null,
+        postalCode: v.postalCode || null,
+        // The first address becomes the default.
+        isDefault: (existing?.n ?? 0) === 0,
+      });
+    });
+  } catch (error) {
+    console.error("[account] save address failed", error instanceof Error ? error.message : error);
+    return { status: "failed" };
+  }
   revalidatePath(ACCOUNT_HOME);
   return { status: "saved" };
 }
 
 export async function removeAddress(id: string): Promise<void> {
   if (!z.uuid().safeParse(id).success) return;
-  const supabase = await createSupabaseServerClient();
-  await supabase.from("addresses").delete().eq("id", id);
+  const customerId = await myCustomerId();
+  if (!customerId) return;
+  await db()
+    .delete(addresses)
+    .where(and(eq(addresses.id, id), eq(addresses.customerId, customerId)));
   revalidatePath(ACCOUNT_HOME);
 }
 
@@ -158,8 +155,18 @@ export async function makeDefaultAddress(id: string): Promise<void> {
   if (!z.uuid().safeParse(id).success) return;
   const customerId = await myCustomerId();
   if (!customerId) return;
-  const supabase = await createSupabaseServerClient();
-  await supabase.from("addresses").update({ is_default: false }).eq("customer_id", customerId);
-  await supabase.from("addresses").update({ is_default: true }).eq("id", id);
+  await db().transaction(async (tx) => {
+    const [own] = await tx
+      .select({ id: addresses.id })
+      .from(addresses)
+      .where(and(eq(addresses.id, id), eq(addresses.customerId, customerId)))
+      .limit(1);
+    if (!own) return;
+    await tx
+      .update(addresses)
+      .set({ isDefault: false })
+      .where(eq(addresses.customerId, customerId));
+    await tx.update(addresses).set({ isDefault: true }).where(eq(addresses.id, id));
+  });
   revalidatePath(ACCOUNT_HOME);
 }

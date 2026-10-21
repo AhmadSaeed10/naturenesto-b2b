@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { HANDLE_PATTERN, toTag } from "@/lib/handle";
-import { Constants } from "@/lib/supabase/database.types";
+import { ENUMS } from "@/lib/db/enums";
 
 const MAX_PAISA = 100_000_000_00;
 const paisa = z.number().int().min(0).max(MAX_PAISA);
@@ -37,7 +37,7 @@ export const productSchema = z
     title: z.string().trim().min(1).max(200),
     handle: z.string().trim().max(100).regex(HANDLE_PATTERN),
     description: z.string().max(10_000),
-    status: z.enum(Constants.public.Enums.product_status),
+    status: z.enum(ENUMS.product_status),
     vendor: z.string().trim().max(100),
     product_type: z.string().trim().max(100),
     tags: z

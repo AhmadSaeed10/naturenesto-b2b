@@ -3,8 +3,16 @@ import { cacheLife, cacheTag } from "next/cache";
 import { descriptionText } from "@/lib/admin/product-schema";
 import { richTextSource } from "@/lib/cms/rich-text";
 import { mediaUrl } from "@/lib/media";
-import type { Json } from "@/lib/supabase/database.types";
-import { createSupabasePublicClient } from "@/lib/supabase/server";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { db, isDatabaseConfigured } from "@/lib/db";
+import type { Json } from "@/lib/db/enums";
+import {
+  mediaAssets,
+  productImages,
+  productOptions,
+  products,
+  productVariants,
+} from "@/lib/db/schema";
 
 export interface StoreVariant {
   id: string;
@@ -41,75 +49,79 @@ const asRecord = (value: Json): Record<string, string> =>
       )
     : {};
 
-/** An active product for its page. RLS hides drafts and deleted products from the anon key. */
+/** An active product for its page. Drafts and deleted products are never returned. */
 export async function getProduct(handle: string): Promise<StoreProduct | null> {
   "use cache";
   cacheLife("hours");
   cacheTag("products", `product:${handle}`);
-  const supabase = createSupabasePublicClient();
-  if (!supabase) return null;
-  const { data } = await supabase
-    .from("products")
-    .select(
-      `id, handle, title, description, product_type, vendor, tags, seo_title, seo_description,
-       product_options (name, values, position),
-       product_variants (id, title, sku, price, compare_at_price, option_values, stock, track_inventory,
-         allow_backorder, low_stock_threshold, position),
-       product_images (alt, position, media_assets (external_url, storage_path, alt, decorative))`,
+  if (!isDatabaseConfigured()) return null;
+  const [data] = await db()
+    .select()
+    .from(products)
+    .where(
+      and(eq(products.handle, handle), eq(products.status, "active"), isNull(products.deletedAt)),
     )
-    .eq("handle", handle)
-    .eq("status", "active")
-    .is("deleted_at", null)
-    .maybeSingle();
+    .limit(1);
   if (!data) return null;
+
+  const [optionRows, variantRows, imageRows] = await Promise.all([
+    db()
+      .select()
+      .from(productOptions)
+      .where(eq(productOptions.productId, data.id))
+      .orderBy(asc(productOptions.position)),
+    db()
+      .select()
+      .from(productVariants)
+      .where(eq(productVariants.productId, data.id))
+      .orderBy(asc(productVariants.position)),
+    db()
+      .select({
+        alt: productImages.alt,
+        externalUrl: mediaAssets.externalUrl,
+        storagePath: mediaAssets.storagePath,
+        mediaAlt: mediaAssets.alt,
+        decorative: mediaAssets.decorative,
+      })
+      .from(productImages)
+      .innerJoin(mediaAssets, eq(mediaAssets.id, productImages.mediaId))
+      .where(eq(productImages.productId, data.id))
+      .orderBy(asc(productImages.position)),
+  ]);
 
   return {
     id: data.id,
     handle: data.handle,
     title: data.title,
     // Descriptions are plain text today; rich text is read the same way when it arrives.
-    description: richTextSource(data.description) || descriptionText(data.description),
-    productType: data.product_type,
+    description:
+      richTextSource(data.description as Json) || descriptionText(data.description as Json),
+    productType: data.productType,
     vendor: data.vendor,
     tags: data.tags,
-    seoTitle: data.seo_title,
-    seoDescription: data.seo_description,
-    options: [...data.product_options]
-      .sort((a, b) => a.position - b.position)
-      .map(({ name, values }) => ({ name, values })),
-    variants: [...data.product_variants]
-      .sort((a, b) => a.position - b.position)
-      .map((v) => {
-        const available = !v.track_inventory || v.allow_backorder || v.stock > 0;
-        return {
-          id: v.id,
-          title: v.title,
-          sku: v.sku,
-          price: v.price,
-          compareAtPrice: v.compare_at_price,
-          optionValues: asRecord(v.option_values),
-          available,
-          lowStock:
-            v.track_inventory &&
-            !v.allow_backorder &&
-            v.stock > 0 &&
-            v.stock <= v.low_stock_threshold
-              ? v.stock
-              : null,
-        };
-      }),
-    images: [...data.product_images]
-      .sort((a, b) => a.position - b.position)
-      .flatMap((image) =>
-        image.media_assets
-          ? [
-              {
-                src: mediaUrl(image.media_assets),
-                alt: image.media_assets.decorative ? "" : (image.alt ?? image.media_assets.alt),
-              },
-            ]
-          : [],
-      ),
+    seoTitle: data.seoTitle,
+    seoDescription: data.seoDescription,
+    options: optionRows.map(({ name, values }) => ({ name, values })),
+    variants: variantRows.map((v) => {
+      const available = !v.trackInventory || v.allowBackorder || v.stock > 0;
+      return {
+        id: v.id,
+        title: v.title,
+        sku: v.sku,
+        price: v.price,
+        compareAtPrice: v.compareAtPrice,
+        optionValues: asRecord(v.optionValues as Json),
+        available,
+        lowStock:
+          v.trackInventory && !v.allowBackorder && v.stock > 0 && v.stock <= v.lowStockThreshold
+            ? v.stock
+            : null,
+      };
+    }),
+    images: imageRows.map((image) => ({
+      src: mediaUrl(image),
+      alt: image.decorative ? "" : (image.alt ?? image.mediaAlt),
+    })),
   };
 }
 
@@ -118,13 +130,11 @@ export async function listProductHandles(): Promise<string[]> {
   "use cache";
   cacheLife("hours");
   cacheTag("products");
-  const supabase = createSupabasePublicClient();
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from("products")
-    .select("handle")
-    .eq("status", "active")
-    .is("deleted_at", null)
+  if (!isDatabaseConfigured()) return [];
+  const rows = await db()
+    .select({ handle: products.handle })
+    .from(products)
+    .where(and(eq(products.status, "active"), isNull(products.deletedAt)))
     .limit(500);
-  return (data ?? []).map((row) => row.handle);
+  return rows.map((row) => row.handle);
 }

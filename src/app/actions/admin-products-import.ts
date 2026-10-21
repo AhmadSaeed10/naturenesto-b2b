@@ -12,8 +12,9 @@ import { ACCESS, staffWithRole } from "@/lib/auth/staff";
 import { parseCsv } from "@/lib/csv";
 import { toHandle } from "@/lib/handle";
 import { rupeesToPaisa } from "@/lib/money";
-import type { Json } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { asc, eq, sql } from "drizzle-orm";
+import { db, withActor } from "@/lib/db";
+import { productImages, products, productVariants } from "@/lib/db/schema";
 
 export interface ImportState {
   status: "idle" | "done" | "file" | "header" | "forbidden";
@@ -37,7 +38,8 @@ export async function importProducts(
   _previous: ImportState,
   formData: FormData,
 ): Promise<ImportState> {
-  if (!(await staffWithRole(ACCESS.catalog))) return { status: "forbidden" };
+  const actor = await staffWithRole(ACCESS.catalog);
+  if (!actor) return { status: "forbidden" };
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0 || file.size > CSV_MAX_BYTES)
     return { status: "file" };
@@ -68,7 +70,6 @@ export async function importProducts(
     groups.set(handle, [...(groups.get(handle) ?? []), row]);
   }
 
-  const supabase = await createSupabaseServerClient();
   let created = 0;
   let updated = 0;
   const failed: string[] = [];
@@ -76,14 +77,34 @@ export async function importProducts(
   for (const [handle, group] of groups) {
     const head = group[0];
     if (!head) continue;
-    const { data: existing } = await supabase
-      .from("products")
-      .select(
-        `id, product_variants (id, sku, title, stock),
-         product_images (media_id, alt, position)`,
-      )
-      .eq("handle", handle)
-      .maybeSingle();
+    const [product] = await db()
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.handle, handle))
+      .limit(1);
+    const existing = product
+      ? {
+          id: product.id,
+          product_variants: await db()
+            .select({
+              id: productVariants.id,
+              sku: productVariants.sku,
+              title: productVariants.title,
+              stock: productVariants.stock,
+            })
+            .from(productVariants)
+            .where(eq(productVariants.productId, product.id)),
+          product_images: await db()
+            .select({
+              media_id: productImages.mediaId,
+              alt: productImages.alt,
+              position: productImages.position,
+            })
+            .from(productImages)
+            .where(eq(productImages.productId, product.id))
+            .orderBy(asc(productImages.position)),
+        }
+      : null;
 
     const optionNames = [head["Option1 Name"], head["Option2 Name"], head["Option3 Name"]].filter(
       Boolean,
@@ -166,19 +187,23 @@ export async function importProducts(
 
     // Collections and categories are left untouched on import.
     const { collection_ids: _c, category_ids: _k, description, ...payload } = parsed.data;
-    const { error } = await supabase.rpc("save_product", {
-      p: { ...payload, description: { format: "plain", text: description } } as unknown as Json,
-    });
-    if (error) {
+    try {
+      // One transaction per product: it is saved and its stock corrected together, or not at all.
+      await withActor(actor.id, async (tx) => {
+        const body = JSON.stringify({
+          ...payload,
+          description: { format: "plain", text: description },
+        });
+        await tx.execute(sql`select public.save_product(${body}::jsonb)`);
+        for (const change of stockChanges) {
+          await tx.execute(
+            sql`select public.adjust_stock(${change.variantId}::uuid, ${change.delta}, 'import'::public.stock_reason, '')`,
+          );
+        }
+      });
+    } catch {
       failed.push(handle);
       continue;
-    }
-    for (const change of stockChanges) {
-      await supabase.rpc("adjust_stock", {
-        p_variant_id: change.variantId,
-        p_delta: change.delta,
-        p_reason: "import",
-      });
     }
     if (existing) updated += 1;
     else created += 1;

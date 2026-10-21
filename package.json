@@ -19,15 +19,15 @@
     "db:migrate": "node --env-file-if-exists=.env.local scripts/db/migrate.ts",
     "db:seed": "node --env-file-if-exists=.env.local scripts/db/seed.ts",
     "db:check": "node --env-file-if-exists=.env.local scripts/db/check.ts",
-    "db:smoke": "node --env-file-if-exists=.env.local scripts/db/smoke.ts"
+    "db:smoke": "node --env-file-if-exists=.env.local scripts/db/smoke.ts",
+    "auth:owner": "node --env-file-if-exists=.env.local scripts/db/invite-owner.ts"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.2.0",
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.118.0",
+    "better-auth": "^1.7.12",
     "drizzle-orm": "^0.45.4",
     "motion": "^14.3.0",
     "next": "16.4.2",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
@@ -39,12 +39,11 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
-    "pg": "^8.23.1",
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "supabase": "^2.121.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

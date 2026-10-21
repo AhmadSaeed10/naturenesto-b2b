@@ -2,20 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useId, useState } from "react";
-import { createMediaAsset } from "@/app/actions/admin-media";
+import { createMediaAsset, createUploadTarget } from "@/app/actions/admin-media";
 import { FloatingField } from "@/components/forms/FloatingField";
 import { Button } from "@/components/ui/Button";
 import { admin } from "@/content/admin";
-import { MEDIA_BUCKET } from "@/lib/media";
 import {
-  MEDIA_EXTENSIONS,
   MEDIA_MAX_BYTES,
   MEDIA_MAX_EDGE,
   MEDIA_TYPES,
   type MediaType,
   isMediaType,
 } from "@/lib/media-rules";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const copy = admin.media.upload;
 type UploadError = keyof typeof copy.errors;
@@ -53,12 +50,6 @@ async function prepare(file: File, type: MediaType): Promise<Prepared> {
   return { blob, type: RESIZED_TYPE, width: canvas.width, height: canvas.height };
 }
 
-function objectPath(type: MediaType): string {
-  const now = new Date();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `${now.getUTCFullYear()}/${month}/${crypto.randomUUID()}.${MEDIA_EXTENSIONS[type]}`;
-}
-
 export function MediaUploader() {
   const router = useRouter();
   const decorativeId = useId();
@@ -85,12 +76,18 @@ export function MediaUploader() {
     setPending(true);
     try {
       const prepared = await prepare(file, file.type);
-      const path = objectPath(prepared.type);
-      const supabase = createSupabaseBrowserClient();
-      const { error: uploadError } = await supabase.storage
-        .from(MEDIA_BUCKET)
-        .upload(path, prepared.blob, { contentType: prepared.type, cacheControl: "31536000" });
-      if (uploadError) throw uploadError;
+      const target = await createUploadTarget({
+        mimeType: prepared.type,
+        sizeBytes: prepared.blob.size,
+      });
+      if (!target.ok) throw new Error(target.error);
+      const path = target.path;
+      const upload = await fetch(target.url, {
+        method: "PUT",
+        headers: { "Content-Type": prepared.type },
+        body: prepared.blob,
+      });
+      if (!upload.ok) throw new Error(`upload refused (${upload.status})`);
 
       const result = await createMediaAsset({
         storagePath: path,

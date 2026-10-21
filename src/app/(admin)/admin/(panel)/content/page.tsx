@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { admin } from "@/content/admin";
 import { listHomeSections } from "@/lib/admin/content";
+import { ACCESS, requireStaff } from "@/lib/auth/staff";
 
 const copy = admin.content;
 
 export default async function ContentHomePage() {
+  // The layout gates the panel too; checking here keeps this page safe on its own.
+  await requireStaff(ACCESS.content);
   const sections = await listHomeSections();
   return (
     <div className="flex flex-col gap-4">

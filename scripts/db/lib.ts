@@ -5,6 +5,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { normalizeDatabaseUrl } from "../../src/lib/db/url.ts";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 export const migrationsDir = resolve(root, "db/migrations");
@@ -49,7 +50,7 @@ export function isLocal(url: string): boolean {
 }
 
 export async function withClient<T>(fn: (client: pg.Client) => Promise<T>): Promise<T> {
-  const client = new pg.Client({ connectionString: connectionString() });
+  const client = new pg.Client({ connectionString: normalizeDatabaseUrl(connectionString()) });
   await client.connect();
   try {
     return await fn(client);
