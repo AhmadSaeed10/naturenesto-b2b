@@ -127,6 +127,10 @@ export interface Product {
   size?: string;
   badges?: ProductBadge[];
   inStock: boolean;
-  /** Product page, for live catalogue products; sample products have none. */
+  /** Product page. Sample products have one too, with enquiry instead of the cart. */
   href?: string;
+  /** Second image, shown on hover where the card supports it. */
+  hoverImage?: ImageAsset;
+  /** Live products can be added to the cart straight from the card when they have one variant. */
+  quickAddVariantId?: string;
 }

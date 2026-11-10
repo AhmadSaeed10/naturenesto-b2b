@@ -315,6 +315,8 @@ const ROWS: Row[] = [
 export const sampleProducts: Product[] = ROWS.map(({ image, inStock = true, ...row }) => ({
   ...row,
   inStock,
+  // Sample products open a read-only page too, so the shop never leads nowhere.
+  href: `/products/${row.id}`,
   // Decorative: the product name is printed right under the image.
   image: { src: `/images/products/${image}.webp`, alt: "", flag: "Placeholder image." },
 }));

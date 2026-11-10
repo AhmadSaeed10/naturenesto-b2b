@@ -69,7 +69,9 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
     return rows.flatMap((row): Product[] => {
       const variants = variantRows.filter((v) => v.productId === row.id).sort(byPosition);
       const variant = variants[0];
-      const image = imageRows.filter((i) => i.productId === row.id).sort(byPosition)[0];
+      const images = imageRows.filter((i) => i.productId === row.id).sort(byPosition);
+      const image = images[0];
+      const hover = images[1];
       if (!variant || !image) return [];
       const inStock = variants.some((v) => !v.trackInventory || v.allowBackorder || v.stock > 0);
       return [
@@ -91,6 +93,9 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
             .filter(isBadge),
           inStock,
           href: `/products/${row.handle}`,
+          hoverImage: hover ? { src: mediaUrl(hover), alt: "" } : undefined,
+          // One purchasable variant means the card can add it without a trip to the page.
+          quickAddVariantId: variants.length === 1 && inStock ? variant.id : undefined,
         },
       ];
     });
