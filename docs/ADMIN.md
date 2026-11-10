@@ -64,7 +64,8 @@ Rich text uses a small Markdown subset (`## heading`, `**bold**`, `*italic*`, `[
 1. Upload its photos in **Media** (with alt text).
 2. **Products > Add product**: title (the handle fills in), description, images, and options if it comes in sizes or colours, then **Update variants from options**.
 3. Set each variant's price and starting stock. Add tags that match the storefront categories (`indoor-plants`, `pet-friendly`, `easy-care`, `orchids`, `large-plants`, `low-light`, `plant-care`, `outdoor-plants`, `pots-and-planters`) and badges as `badge:new`, `badge:pet-safe`, `badge:low-light`, `badge:easy-care` or `badge:bestseller`.
-4. Set status to **Active** and save. The category pages switch from the sample catalogue to live products as soon as a category has an active product.
+4. For plants, fill the **Plant care** card (light, watering, pets, care level, size note, care notes). They show as icons and an accordion on the product page; empty fields are hidden. Add two or more images so the page gets a thumbnail rail and the shop card a hover image.
+5. Set status to **Active** and save. The category pages switch from the sample catalogue to live products as soon as a category has an active product.
 
 Stock never changes silently: the editor sets starting stock once, and every later change goes through **Inventory** (or a CSV import) and is logged in `inventory_adjustments`.
 
