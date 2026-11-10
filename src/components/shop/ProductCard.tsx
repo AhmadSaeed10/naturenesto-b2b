@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { QuickAdd } from "./QuickAdd";
 import { commerce } from "@/content/commerce";
 import { shop } from "@/content/shop";
 import type { Product } from "@/content/types";
@@ -28,10 +29,21 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
           priority={priority}
           className={cn(
-            "object-cover transition-transform duration-(--duration-reveal) ease-brand group-hover:scale-105",
+            "object-cover transition-[transform,opacity] duration-(--duration-reveal) ease-brand group-hover:scale-105",
+            product.hoverImage && "pointer-fine:group-hover:opacity-0",
             !product.inStock && "opacity-60 grayscale",
           )}
         />
+        {product.hoverImage ? (
+          // Decorative second angle, desktop pointer only; the card link already names the product.
+          <Image
+            src={product.hoverImage.src}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 25vw, 33vw"
+            className="hidden object-cover opacity-0 transition-opacity duration-(--duration-reveal) ease-brand group-hover:opacity-100 pointer-fine:block"
+          />
+        ) : null}
         {product.badges && product.badges.length > 0 ? (
           <ul className="absolute top-3 left-3 flex flex-wrap gap-1.5">
             {product.badges.map((badge) => (
@@ -64,35 +76,40 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
             <s className="text-small text-ink-muted">{formatPrice(product.compareAtPrice)}</s>
           ) : null}
         </p>
-        <div className="mt-auto pt-4">
-          {product.href ? (
-            // Live products are bought on their page; the button sits above the card link.
+        <div className="mt-auto flex items-center gap-2 pt-4">
+          {!product.href ? (
+            product.inStock ? (
+              <Button
+                href={enquiry}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="secondary"
+                withArrow
+                className="w-full sm:w-auto"
+                aria-label={`${shop.enquire}: ${product.name}`}
+              >
+                {shop.enquire}
+              </Button>
+            ) : (
+              <p className="inline-flex min-h-(--size-tap) items-center text-small font-medium text-ink-muted">
+                {shop.outOfStock}
+              </p>
+            )
+          ) : (
+            // The whole card links through the title; the button sits above that link.
             <Button
               href={product.href}
               variant="secondary"
               withArrow
-              className="relative z-10 w-full sm:w-auto"
+              className="relative z-10 flex-1 sm:flex-none"
               aria-label={`${commerce.product.view}: ${product.name}`}
             >
               {product.inStock ? commerce.product.view : shop.outOfStock}
             </Button>
-          ) : product.inStock ? (
-            <Button
-              href={enquiry}
-              target="_blank"
-              rel="noopener noreferrer"
-              variant="secondary"
-              withArrow
-              className="w-full sm:w-auto"
-              aria-label={`${shop.enquire}: ${product.name}`}
-            >
-              {shop.enquire}
-            </Button>
-          ) : (
-            <p className="inline-flex min-h-(--size-tap) items-center text-small font-medium text-ink-muted">
-              {shop.outOfStock}
-            </p>
           )}
+          {product.quickAddVariantId && product.inStock ? (
+            <QuickAdd variantId={product.quickAddVariantId} name={product.name} />
+          ) : null}
         </div>
       </div>
     </article>
