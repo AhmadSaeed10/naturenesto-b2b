@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { addToCart } from "@/app/actions/cart";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { commerce } from "@/content/commerce";
 import { shop } from "@/content/shop";
 import type { StoreProduct } from "@/lib/commerce/products";
@@ -12,20 +13,27 @@ import { cn } from "@/lib/utils";
 import { CART_EVENT } from "./CartLink";
 
 const copy = commerce.product;
+const MAX_QUANTITY = 99;
 
 interface ProductPurchaseProps {
-  product: Pick<StoreProduct, "title" | "options" | "variants">;
+  product: Pick<StoreProduct, "title" | "options" | "variants" | "source">;
   whatsappHref: string;
 }
 
+const STEP_BUTTON =
+  "inline-flex size-11 items-center justify-center text-ink transition-colors duration-(--duration-micro) ease-brand hover:bg-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark disabled:text-ink-muted disabled:hover:bg-transparent";
+
 export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps) {
   const uid = useId();
+  const readOnly = product.source === "sample";
   const first = product.variants.find((v) => v.available) ?? product.variants[0];
   const [selected, setSelected] = useState<Record<string, string>>(first?.optionValues ?? {});
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState("");
   const [added, setAdded] = useState(false);
   const [pending, startTransition] = useTransition();
+  const cta = useRef<HTMLDivElement>(null);
+  const [barVisible, setBarVisible] = useState(false);
 
   const variant = useMemo(
     () =>
@@ -36,6 +44,24 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
           ),
     [product, selected],
   );
+
+  const maxQuantity = variant?.lowStock ?? MAX_QUANTITY;
+  const canBuy = Boolean(variant?.available) && !readOnly;
+  const saving =
+    variant?.compareAtPrice && variant.compareAtPrice > variant.price
+      ? variant.compareAtPrice - variant.price
+      : 0;
+
+  // The mobile bar appears once the main button has scrolled out above the viewport.
+  useEffect(() => {
+    const el = cta.current;
+    if (!el || !canBuy) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry) setBarVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [canBuy]);
 
   function add() {
     if (!variant) return;
@@ -58,14 +84,20 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
   const enquiry = `${whatsappHref}?text=${encodeURIComponent(
     shop.whatsappMessage(label, variant ? formatPaisa(variant.price) : ""),
   )}`;
+  const buttonLabel = pending ? copy.adding : copy.addToCart;
 
   return (
     <div className="flex flex-col gap-6">
       {variant ? (
-        <p className="flex items-baseline gap-3 text-h4">
-          <span className="font-medium">{formatPaisa(variant.price)}</span>
-          {variant.compareAtPrice && variant.compareAtPrice > variant.price ? (
-            <s className="text-lead text-ink-muted">{formatPaisa(variant.compareAtPrice)}</s>
+        <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="font-serif text-h3">{formatPaisa(variant.price)}</span>
+          {saving ? (
+            <>
+              <s className="text-lead text-ink-muted">{formatPaisa(variant.compareAtPrice ?? 0)}</s>
+              <span className="rounded-pill bg-primary-dark px-3 py-1 text-small font-medium text-background">
+                {copy.save(formatPaisa(saving))}
+              </span>
+            </>
           ) : null}
         </p>
       ) : (
@@ -74,7 +106,12 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
 
       {product.options.map((option) => (
         <fieldset key={option.name} className="flex flex-col gap-2">
-          <legend className="mb-2 text-small font-medium">{copy.choose(option.name)}</legend>
+          <legend className="mb-2 text-small font-medium">
+            {option.name}
+            {selected[option.name] ? (
+              <span className="font-normal text-ink-muted">: {selected[option.name]}</span>
+            ) : null}
+          </legend>
           <div className="flex flex-wrap gap-2">
             {option.values.map((value) => {
               const id = `${uid}-${option.name}-${value}`;
@@ -113,53 +150,123 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
         <p className="text-small font-medium text-ink">{copy.lowStock(variant.lowStock)}</p>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-2">
-          <label htmlFor={`${uid}-qty`} className="text-small font-medium">
-            {copy.quantity}
-          </label>
-          <input
-            id={`${uid}-qty`}
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={variant?.lowStock ?? 99}
-            value={quantity}
-            onChange={(event) =>
-              setQuantity(Math.max(1, Math.min(99, Number(event.target.value) || 1)))
-            }
-            className="min-h-(--size-tap) w-24 rounded-pill border border-ink-muted bg-background px-4 text-center"
-          />
-        </div>
-        {variant && variant.available ? (
-          <Button type="button" onClick={add} disabled={pending} withArrow>
-            {pending ? copy.adding : copy.addToCart}
-          </Button>
-        ) : (
-          <p className="inline-flex min-h-(--size-tap) items-center font-medium text-ink-muted">
-            {copy.outOfStock}
+      {readOnly ? (
+        <div className="flex flex-col gap-4">
+          <p className="rounded-card border border-dashed border-ink/30 px-4 py-3 text-small text-ink">
+            {copy.sample}
           </p>
-        )}
-      </div>
+          {variant?.available ? (
+            <Button
+              href={enquiry}
+              target="_blank"
+              rel="noopener noreferrer"
+              withArrow
+              className="w-full sm:w-auto"
+            >
+              {copy.enquire}
+            </Button>
+          ) : (
+            <p className="font-medium text-ink-muted">{copy.outOfStock}</p>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {canBuy ? (
+            <div ref={cta} className="flex flex-wrap items-center gap-3">
+              <div
+                role="group"
+                aria-label={copy.quantity}
+                className="inline-flex items-center rounded-pill border border-ink-muted"
+              >
+                <button
+                  type="button"
+                  aria-label={copy.decrease}
+                  disabled={quantity <= 1}
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className={cn(STEP_BUTTON, "rounded-l-pill")}
+                >
+                  <Icon name="minus" size={18} />
+                </button>
+                <input
+                  id={`${uid}-qty`}
+                  type="number"
+                  inputMode="numeric"
+                  aria-label={copy.quantity}
+                  min={1}
+                  max={maxQuantity}
+                  value={quantity}
+                  onChange={(event) =>
+                    setQuantity(Math.max(1, Math.min(maxQuantity, Number(event.target.value) || 1)))
+                  }
+                  className="h-11 w-12 [appearance:textfield] bg-transparent text-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  aria-label={copy.increase}
+                  disabled={quantity >= maxQuantity}
+                  onClick={() => setQuantity((q) => Math.min(maxQuantity, q + 1))}
+                  className={cn(STEP_BUTTON, "rounded-r-pill")}
+                >
+                  <Icon name="plus" size={18} />
+                </button>
+              </div>
+              <Button
+                type="button"
+                onClick={add}
+                disabled={pending}
+                withArrow
+                className="min-w-48 flex-1 sm:flex-none"
+              >
+                {buttonLabel}
+              </Button>
+            </div>
+          ) : (
+            <p className="inline-flex min-h-(--size-tap) items-center font-medium text-ink-muted">
+              {copy.outOfStock}
+            </p>
+          )}
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex min-h-6 flex-wrap items-center gap-3 text-small"
+          >
+            {added ? <Icon name="check" size={18} className="text-primary-dark" /> : null}
+            {message}
+            {added ? (
+              <Link href="/cart" className="text-primary-dark underline underline-offset-4">
+                {copy.viewCart}
+              </Link>
+            ) : null}
+          </div>
+          <div>
+            <Button href={enquiry} target="_blank" rel="noopener noreferrer" variant="link">
+              {copy.enquire}
+            </Button>
+          </div>
+        </div>
+      )}
 
-      <div
-        role="status"
-        aria-live="polite"
-        className="flex min-h-6 flex-wrap items-center gap-3 text-small"
-      >
-        {message}
-        {added ? (
-          <Link href="/cart" className="text-primary-dark underline underline-offset-4">
-            {copy.viewCart}
-          </Link>
-        ) : null}
-      </div>
-
-      <div>
-        <Button href={enquiry} target="_blank" rel="noopener noreferrer" variant="link">
-          {copy.enquire}
-        </Button>
-      </div>
+      {/* Mobile only: keeps the buy action in reach once the main button has scrolled away. */}
+      {canBuy ? (
+        <div
+          inert={!barVisible}
+          aria-hidden={!barVisible}
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-line bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-(--duration-reveal) ease-brand lg:hidden",
+            barVisible ? "translate-y-0" : "translate-y-full",
+          )}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-small font-medium">{product.title}</p>
+            {variant ? (
+              <p className="text-small text-ink-muted">{formatPaisa(variant.price)}</p>
+            ) : null}
+          </div>
+          <Button type="button" onClick={add} disabled={pending} className="shrink-0">
+            {added && !pending ? copy.added_short : buttonLabel}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
