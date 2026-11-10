@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { careSchema } from "@/lib/care";
 import { HANDLE_PATTERN, toTag } from "@/lib/handle";
 import { ENUMS } from "@/lib/db/enums";
 
@@ -46,6 +47,8 @@ export const productSchema = z
       .transform((tags) => [...new Set(tags.map(toTag).filter(Boolean))]),
     seo_title: z.string().trim().max(70),
     seo_description: z.string().trim().max(170),
+    /** Omitted by the CSV import, which then leaves the stored care alone. */
+    care: careSchema.optional(),
     options: z.array(optionSchema).max(MAX_OPTIONS),
     variants: z.array(variantSchema).min(1).max(MAX_VARIANTS),
     images: z

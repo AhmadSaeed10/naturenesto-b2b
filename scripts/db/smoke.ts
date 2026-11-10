@@ -226,6 +226,14 @@ async function run(client: Client): Promise<void> {
             handle: "smoke-plant",
             status: "draft",
             tags: ["smoke"],
+            care: {
+              light: "bright",
+              water: "low",
+              pet: "safe",
+              level: "easy",
+              size: "",
+              notes: "",
+            },
             options: [],
             images: [],
             variants: [{ title: "Default", price: 150000, initial_stock: 3 }],
@@ -247,6 +255,30 @@ async function run(client: Client): Promise<void> {
         [copy.rows[0]?.id],
       );
       assert.equal(copied.rows[0]?.handle, "smoke-plant-copy");
+      // care is stored, copied, and left alone by a save that does not send it (CSV import)
+      const care = await client.query<{ care: { light?: string } }>(
+        "select care from public.products where id = $1",
+        [copy.rows[0]?.id],
+      );
+      assert.equal(care.rows[0]?.care.light, "bright");
+      // Saving again without care (the CSV import) must not wipe it.
+      await client.query("select public.save_product($1::jsonb)", [
+        JSON.stringify({
+          id: copy.rows[0]?.id,
+          title: "Smoke plant (copy)",
+          handle: "smoke-plant-copy",
+          status: "draft",
+          tags: ["smoke"],
+          options: [],
+          images: [],
+          variants: [{ title: "Default", price: 150000 }],
+        }),
+      ]);
+      const kept = await client.query<{ care: { light?: string } }>(
+        "select care from public.products where id = $1",
+        [copy.rows[0]?.id],
+      );
+      assert.equal(kept.rows[0]?.care.light, "bright");
     },
   );
 

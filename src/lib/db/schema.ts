@@ -189,6 +189,7 @@ export const products = pgTable(
       .notNull(),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
+    care: jsonb().default({}).notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),

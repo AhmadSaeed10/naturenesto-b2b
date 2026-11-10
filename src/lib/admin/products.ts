@@ -1,4 +1,5 @@
 import "server-only";
+import { parseCare } from "@/lib/care";
 import { mediaUrl } from "@/lib/media";
 import {
   type SQL,
@@ -276,6 +277,7 @@ export async function getProductForEditor(id: string): Promise<EditorProduct | n
     tags: data.tags,
     seo_title: data.seoTitle ?? "",
     seo_description: data.seoDescription ?? "",
+    care: parseCare(data.care),
     options: optionRows.map((option) => ({ name: option.name, values: option.values })),
     variants: variantRows.map((variant) => ({
       id: variant.id,
