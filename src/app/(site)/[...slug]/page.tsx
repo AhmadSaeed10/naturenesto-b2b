@@ -22,6 +22,11 @@ const DEDICATED = new Set([
   "/blogs",
   "/workshops",
   "/faq",
+  "/about",
+  "/our-story",
+  "/shipping",
+  "/workplace-policy",
+  "/careers",
   ...services.map((service) => service.href),
   ...catalogCategories.map((category) => category.href),
 ]);
