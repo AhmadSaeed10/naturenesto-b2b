@@ -15,17 +15,17 @@ export function PlantsForEveryone({ data = sectionFallbacks.plants }: PlantsForE
   const { title: categoriesTitle, categories } = data;
   return (
     <section aria-labelledby={TITLE_ID}>
-      <div className="mx-auto max-w-7xl px-4 pt-20 pb-28 md:px-8 md:pt-32 md:pb-40">
+      <div className="mx-auto max-w-7xl px-4 pt-16 pb-20 md:px-8 md:pt-24 md:pb-28">
         <SplitHeading
           id={TITLE_ID}
           text={categoriesTitle}
           emphasis={["Everyone"]}
-          className="mb-12 text-h1 md:mb-16"
+          className="mb-10 text-h2 md:mb-14"
         />
-        {/* Offset masonry: every second column drops, so the grid reads as a printed spread */}
+        {/* Even grid, as on thesill.com: aligned rows read cleaner than an offset spread */}
         <Stagger
           as="ul"
-          className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4 md:gap-x-6 md:gap-y-12 [&>li:nth-child(even)]:translate-y-10 md:[&>li:nth-child(even)]:translate-y-16"
+          className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4 md:gap-x-6 md:gap-y-12"
         >
           {categories.map((category, index) => (
             <StaggerItem as="li" key={category.slug}>

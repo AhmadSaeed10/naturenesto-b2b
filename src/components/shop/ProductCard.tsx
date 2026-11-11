@@ -96,7 +96,7 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
 
       <div className="flex flex-1 flex-col gap-1 pt-5">
         <div className="flex items-baseline justify-between gap-3 border-t-[1.5px] border-ink pt-3">
-          <h3 className="font-serif text-h4 leading-tight text-ink">
+          <h3 className="min-w-0 font-serif text-h4 leading-tight [overflow-wrap:anywhere] text-ink">
             {product.href ? (
               // The whole card is clickable through this link's stretched hit area.
               <Link href={product.href} className="after:absolute after:inset-0 after:content-['']">

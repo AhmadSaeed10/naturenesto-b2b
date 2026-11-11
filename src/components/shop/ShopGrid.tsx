@@ -194,7 +194,7 @@ export function ShopGrid({ products, whatsappHref }: ShopGridProps) {
           {shown.flatMap((product, index) => [
             ...(index === TILE_AT && shown.length > TILE_AT + 1
               ? [
-                  <StaggerItem as="li" key="tile">
+                  <StaggerItem as="li" key="tile" className="min-w-0">
                     <div className="relative flex h-full min-h-80 flex-col justify-between gap-6 rounded-card bg-ink p-6 text-background">
                       <FrameCorners className="m-3 text-background/30" />
                       <h3 className="font-serif text-h3 leading-tight">{shop.tile.title}</h3>
@@ -204,7 +204,7 @@ export function ShopGrid({ products, whatsappHref }: ShopGridProps) {
                           href="/consultation"
                           variant="secondary"
                           withArrow
-                          className="border-background text-background"
+                          className="border-background px-4! py-2 text-center whitespace-normal! text-background"
                         >
                           {shop.tile.cta}
                         </Button>
@@ -213,7 +213,7 @@ export function ShopGrid({ products, whatsappHref }: ShopGridProps) {
                   </StaggerItem>,
                 ]
               : []),
-            <StaggerItem as="li" key={product.id}>
+            <StaggerItem as="li" key={product.id} className="min-w-0">
               <ProductCard product={product} whatsappHref={whatsappHref} priority={index < 4} />
             </StaggerItem>,
           ])}

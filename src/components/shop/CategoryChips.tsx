@@ -11,7 +11,10 @@ interface CategoryChipsProps {
 /** Sideways wayfinding between shop pages. Scrolls horizontally on small screens. */
 export function CategoryChips({ current }: CategoryChipsProps) {
   return (
-    <nav aria-label={shop.browse} className="-mx-4 overflow-x-auto px-4 pb-2 md:mx-0 md:px-0">
+    <nav
+      aria-label={shop.browse}
+      className="-mx-4 max-w-[100vw] min-w-0 overflow-x-auto px-4 pb-2 md:mx-0 md:px-0"
+    >
       <ul className="flex w-max gap-2 md:w-auto md:flex-wrap">
         {catalogCategories.map((category) => {
           const active = category.slug === current;
