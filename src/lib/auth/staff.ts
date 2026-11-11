@@ -63,6 +63,7 @@ export const ACCESS = {
   content: ["owner", "admin", "editor"],
   orders: ["owner", "admin", "support"],
   customers: ["owner", "admin", "support"],
+  reviews: ["owner", "admin", "support"],
   redirects: ["owner", "admin"],
   storeSettings: ["owner", "admin"],
   staff: ["owner", "admin"],

@@ -17,6 +17,7 @@ function allowedSections(staff: StaffMember): string[] {
   if (canAccess(staff.role, "content")) keys.push("content");
   if (canAccess(staff.role, "orders")) keys.push("orders");
   if (canAccess(staff.role, "customers")) keys.push("customers");
+  if (canAccess(staff.role, "reviews")) keys.push("reviews");
   return keys;
 }
 

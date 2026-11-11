@@ -23,6 +23,7 @@ export const admin = {
     { key: "inventory", label: "Inventory", href: "/admin/inventory" },
     { key: "orders", label: "Orders", href: "/admin/orders" },
     { key: "customers", label: "Customers", href: "/admin/customers" },
+    { key: "reviews", label: "Reviews", href: "/admin/reviews" },
     { key: "discounts", label: "Discounts" },
     { key: "leads", label: "Services and leads" },
     { key: "content", label: "Content", href: "/admin/content" },
@@ -159,6 +160,23 @@ export const admin = {
       last: "Last order",
     },
     detail: { back: "All customers", orders: "Orders", noOrders: "No orders." },
+  },
+  reviews: {
+    title: "Reviews",
+    intro:
+      "Customer reviews go live as soon as they are posted. Hide one to take it off the product page.",
+    empty: "No reviews yet.",
+    columns: {
+      product: "Product",
+      rating: "Rating",
+      review: "Review",
+      date: "Posted",
+      actions: "",
+    },
+    status: { published: "Live", hidden: "Hidden" },
+    hide: "Hide",
+    show: "Show",
+    remove: "Delete",
   },
   dashboard: {
     title: "Dashboard",

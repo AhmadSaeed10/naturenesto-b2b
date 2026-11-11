@@ -16,6 +16,7 @@ import {
   bigint,
   pgSequence,
   pgEnum,
+  smallint,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -1542,4 +1543,20 @@ export const authVerification = pgTable(
       table.identifier.asc().nullsLast().op("text_ops"),
     ),
   ],
+);
+
+export const productReviews = pgTable(
+  "product_reviews",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    handle: text().notNull(),
+    rating: smallint().notNull(),
+    title: text().default("").notNull(),
+    body: text().notNull(),
+    authorName: text("author_name").notNull(),
+    status: text().default("published").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [index("product_reviews_created_idx").using("btree", table.createdAt.desc())],
 );
