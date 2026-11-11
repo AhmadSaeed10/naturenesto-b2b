@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
-import { addToCart } from "@/app/actions/cart";
+import { addToCart, buyNow } from "@/app/actions/cart";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { commerce } from "@/content/commerce";
@@ -10,7 +11,7 @@ import { shop } from "@/content/shop";
 import type { StoreProduct } from "@/lib/commerce/products";
 import { formatPaisa } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { CART_EVENT } from "./CartLink";
+import { CART_EVENT, openCart } from "./cart-events";
 
 const copy = commerce.product;
 const MAX_QUANTITY = 99;
@@ -31,6 +32,7 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState("");
   const [added, setAdded] = useState(false);
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const cta = useRef<HTMLDivElement>(null);
   const [barVisible, setBarVisible] = useState(false);
@@ -73,6 +75,21 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
         setAdded(true);
         setMessage(copy.added);
         window.dispatchEvent(new CustomEvent(CART_EVENT, { detail: result.count }));
+        openCart();
+      } else {
+        setMessage(result.error === "unavailable" ? copy.outOfStock : copy.failed);
+      }
+    });
+  }
+
+  function buy() {
+    if (!variant) return;
+    setMessage("");
+    setAdded(false);
+    startTransition(async () => {
+      const result = await buyNow(variant.id, quantity);
+      if (result.ok) {
+        router.push("/checkout");
       } else {
         setMessage(result.error === "unavailable" ? copy.outOfStock : copy.failed);
       }
@@ -172,54 +189,63 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
       ) : (
         <div className="flex flex-col gap-3">
           {canBuy ? (
-            <div ref={cta} className="flex flex-wrap items-center gap-3">
-              <div
-                role="group"
-                aria-label={copy.quantity}
-                className="inline-flex items-center rounded-pill border border-ink-muted"
-              >
-                <button
-                  type="button"
-                  aria-label={copy.decrease}
-                  disabled={quantity <= 1}
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className={cn(STEP_BUTTON, "rounded-l-pill")}
-                >
-                  <Icon name="minus" size={18} />
-                </button>
-                <input
-                  id={`${uid}-qty`}
-                  type="number"
-                  inputMode="numeric"
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <div
+                  role="group"
                   aria-label={copy.quantity}
-                  min={1}
-                  max={maxQuantity}
-                  value={quantity}
-                  onChange={(event) =>
-                    setQuantity(Math.max(1, Math.min(maxQuantity, Number(event.target.value) || 1)))
-                  }
-                  className="h-11 w-12 [appearance:textfield] bg-transparent text-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-                <button
-                  type="button"
-                  aria-label={copy.increase}
-                  disabled={quantity >= maxQuantity}
-                  onClick={() => setQuantity((q) => Math.min(maxQuantity, q + 1))}
-                  className={cn(STEP_BUTTON, "rounded-r-pill")}
+                  className="inline-flex items-center rounded-pill border border-ink-muted"
                 >
-                  <Icon name="plus" size={18} />
-                </button>
+                  <button
+                    type="button"
+                    aria-label={copy.decrease}
+                    disabled={quantity <= 1}
+                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    className={cn(STEP_BUTTON, "rounded-l-pill")}
+                  >
+                    <Icon name="minus" size={18} />
+                  </button>
+                  <input
+                    id={`${uid}-qty`}
+                    type="number"
+                    inputMode="numeric"
+                    aria-label={copy.quantity}
+                    min={1}
+                    max={maxQuantity}
+                    value={quantity}
+                    onChange={(event) =>
+                      setQuantity(
+                        Math.max(1, Math.min(maxQuantity, Number(event.target.value) || 1)),
+                      )
+                    }
+                    className="h-11 w-12 [appearance:textfield] bg-transparent text-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                  <button
+                    type="button"
+                    aria-label={copy.increase}
+                    disabled={quantity >= maxQuantity}
+                    onClick={() => setQuantity((q) => Math.min(maxQuantity, q + 1))}
+                    className={cn(STEP_BUTTON, "rounded-r-pill")}
+                  >
+                    <Icon name="plus" size={18} />
+                  </button>
+                </div>
               </div>
-              <Button
-                type="button"
-                onClick={add}
-                disabled={pending}
-                withArrow
-                className="min-w-48 flex-1 sm:flex-none"
-              >
-                {buttonLabel}
-              </Button>
-            </div>
+              <div ref={cta} className="flex flex-col gap-3 sm:flex-row">
+                <Button type="button" onClick={add} disabled={pending} withArrow className="flex-1">
+                  {buttonLabel}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={buy}
+                  disabled={pending}
+                  className="flex-1"
+                >
+                  {copy.buyNow}
+                </Button>
+              </div>
+            </>
           ) : (
             <p className="inline-flex min-h-(--size-tap) items-center font-medium text-ink-muted">
               {copy.outOfStock}
@@ -228,7 +254,7 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
           <div
             role="status"
             aria-live="polite"
-            className="flex min-h-6 flex-wrap items-center gap-3 text-small"
+            className="flex flex-wrap items-center gap-3 text-small empty:-mt-3"
           >
             {added ? <Icon name="check" size={18} className="text-primary-dark" /> : null}
             {message}
@@ -262,8 +288,17 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
               <p className="text-small text-ink-muted">{formatPaisa(variant.price)}</p>
             ) : null}
           </div>
-          <Button type="button" onClick={add} disabled={pending} className="shrink-0">
+          <Button type="button" onClick={add} disabled={pending} className="shrink-0 px-4">
             {added && !pending ? copy.added_short : buttonLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={buy}
+            disabled={pending}
+            className="shrink-0 px-4"
+          >
+            {copy.buyNow}
           </Button>
         </div>
       ) : null}

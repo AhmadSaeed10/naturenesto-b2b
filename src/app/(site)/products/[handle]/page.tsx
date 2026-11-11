@@ -5,10 +5,11 @@ import { RichText } from "@/components/cms/RichText";
 import { Reveal } from "@/components/motion/Reveal";
 import { SplitHeading } from "@/components/motion/SplitHeading";
 import { Stagger, StaggerItem } from "@/components/motion/Stagger";
-import { CareGrid } from "@/components/shop/CareGrid";
+import { CareChart } from "@/components/shop/CareChart";
 import { ProductAccordion, type AccordionItem } from "@/components/shop/ProductAccordion";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { ProductGallery } from "@/components/shop/ProductGallery";
+import { SpecimenPlate } from "@/components/shop/SpecimenPlate";
 import { ProductPurchase } from "@/components/shop/ProductPurchase";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/Eyebrow";
@@ -29,6 +30,10 @@ const copy = commerce.product;
 const whatsappHref = needHelp.channels.find((channel) => channel.kind === "whatsapp")?.href ?? "";
 // Cache Components needs one param at build; the placeholder renders a 404.
 const PLACEHOLDER = "no-products-yet";
+
+/** A stable, decorative plate number from the handle, like an index in a botanical atlas. */
+const plateNumber = (handle: string): number =>
+  10 + ([...handle].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 90);
 
 export async function generateStaticParams() {
   const handles = await listProductHandles();
@@ -159,16 +164,44 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
           </ol>
         </nav>
 
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
-          <ProductGallery images={product.images} title={product.title} badges={product.badges} />
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-20">
+          <div className="pr-3 pb-3 md:pr-4 md:pb-4">
+            <SpecimenPlate
+              number={plateNumber(product.handle)}
+              category={category?.title ?? copy.shop}
+              caption={product.title}
+            >
+              <ProductGallery
+                images={product.images}
+                title={product.title}
+                badges={product.badges}
+              />
+            </SpecimenPlate>
+          </div>
 
-          <div className="flex flex-col gap-7 lg:sticky lg:top-28 lg:self-start">
-            <div className="flex flex-col gap-4">
-              <Eyebrow>{product.productType || category?.title || copy.shop}</Eyebrow>
-              <SplitHeading as="h1" text={product.title} className="text-h2" />
+          <div className="flex flex-col gap-8 lg:sticky lg:top-28 lg:self-start">
+            <div className="flex flex-col gap-5">
+              <ul className="flex flex-wrap gap-2">
+                {[product.productType || category?.title || copy.shop, product.care.size]
+                  .filter(Boolean)
+                  .map((label) => (
+                    <li
+                      key={label}
+                      className="rounded-[6px] border border-dashed border-ink/50 px-2.5 py-1 eyebrow text-ink"
+                    >
+                      {label}
+                    </li>
+                  ))}
+              </ul>
+              <SplitHeading as="h1" text={product.title} className="text-h1" />
             </div>
-            <ProductPurchase product={product} whatsappHref={whatsappHref} />
-            <ul className="flex flex-col gap-3 border-t border-line pt-6 text-small">
+
+            <div className="relative rounded-card border-[1.5px] border-ink bg-surface p-5 md:p-7">
+              <Eyebrow className="mb-5 text-ink">{copy.plate.fieldNotes}</Eyebrow>
+              <ProductPurchase product={product} whatsappHref={whatsappHref} />
+            </div>
+
+            <ul className="flex flex-col gap-3 text-small">
               {copy.trust.map((line, index) => (
                 <li key={line} className="flex items-center gap-3">
                   <Icon
@@ -185,25 +218,30 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
       </div>
 
       {product.description || hasCare(product.care) ? (
-        <section className="bg-surface">
+        <section className="border-y border-ink/20 bg-surface">
           <div
             className={
               product.description
-                ? "mx-auto grid max-w-7xl gap-10 px-4 py-16 md:px-8 md:py-24 lg:grid-cols-2 lg:gap-20"
-                : "mx-auto flex max-w-7xl flex-col gap-5 px-4 py-16 md:px-8 md:py-24"
+                ? "mx-auto grid max-w-7xl gap-12 px-4 py-16 md:px-8 md:py-24 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-24"
+                : "mx-auto flex max-w-3xl flex-col gap-5 px-4 py-16 md:px-8 md:py-24"
             }
           >
             {product.description ? (
-              <Reveal className="flex flex-col gap-5">
-                <Eyebrow>{copy.details}</Eyebrow>
-                <h2 className="text-h3">{copy.about(product.title)}</h2>
-                <RichText source={product.description} />
+              <Reveal className="flex flex-col gap-6">
+                <Eyebrow>{copy.plate.notes}</Eyebrow>
+                <h2 className="text-h2">{copy.about(product.title)}</h2>
+                <div className="[&_p:first-child]:first-letter:float-left [&_p:first-child]:first-letter:pr-3 [&_p:first-child]:first-letter:font-serif [&_p:first-child]:first-letter:text-[4.5rem] [&_p:first-child]:first-letter:leading-[0.8]">
+                  <RichText source={product.description} />
+                </div>
               </Reveal>
             ) : null}
             {hasCare(product.care) ? (
-              <Reveal delay={product.description ? 0.08 : 0} className="flex flex-col gap-5">
-                <Eyebrow>{copy.careHeading}</Eyebrow>
-                <CareGrid care={product.care} />
+              <Reveal delay={product.description ? 0.08 : 0} className="flex flex-col gap-6">
+                <div className="flex flex-col gap-2">
+                  <Eyebrow>{copy.plate.chart}</Eyebrow>
+                  <p className="font-serif text-h4 italic">{copy.plate.chartIntro}</p>
+                </div>
+                <CareChart care={product.care} />
               </Reveal>
             ) : null}
           </div>
