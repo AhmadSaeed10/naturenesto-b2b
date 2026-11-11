@@ -31,10 +31,15 @@ const DEDICATED = new Set([
   ...catalogCategories.map((category) => category.href),
 ]);
 
+// Cache Components needs at least one param at build. Every placeholder page now has its own
+// route, so this stays as a harmless path that renders a 404.
+const PLACEHOLDER = ["no-placeholder-pages"];
+
 export function generateStaticParams() {
-  return stubPages
+  const params = stubPages
     .filter((page) => !DEDICATED.has(page.path))
     .map((page) => ({ slug: page.path.slice(1).split("/") }));
+  return params.length ? params : [{ slug: PLACEHOLDER }];
 }
 
 // A published CMS page with this handle (one segment) replaces the placeholder.
