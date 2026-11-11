@@ -35,7 +35,29 @@ export const commerce = {
       close: "Close",
       counter: (n: number, total: number) => `${n} of ${total}`,
     },
-    trust: ["Cash on delivery available", "Styling help on WhatsApp"],
+    // flag: stock, trust and FAQ wording is new, confirm with the client.
+    inStockLine: "In stock",
+    stockNote: "Delivery cost is shown at checkout.",
+    trust: [
+      { icon: "truck", text: "Cash on delivery available" },
+      { icon: "check", text: "Delivered across Pakistan" },
+      { icon: "whatsapp", text: "Styling help on WhatsApp" },
+    ],
+    faqHeading: "Questions we get a lot",
+    faq: [
+      {
+        q: "How often should I water it?",
+        a: "It depends on the plant and your light. The care chapters above say when to water. If the soil is still damp an inch down, wait.",
+      },
+      {
+        q: "Does it come with a pot?",
+        a: "Plants arrive in a simple nursery pot. Add one of our pots on this page and we send them together.",
+      },
+      {
+        q: "How long does delivery take?",
+        a: "We confirm your order by phone and arrange delivery for your city. Message us on WhatsApp for a date.",
+      },
+    ],
     sample: "This is a sample listing. Message us on WhatsApp to check availability.",
     about: (title: string) => `About ${title}`,
     careHeading: "Care at a glance",

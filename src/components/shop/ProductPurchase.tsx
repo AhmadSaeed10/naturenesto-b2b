@@ -24,12 +24,14 @@ interface ProductPurchaseProps {
   whatsappHref: string;
   /** Pots offered beside a plant; picking one adds it with the plant. */
   pots?: PairingPot[];
+  /** First product photo, for the mobile sticky bar. */
+  image?: { src: string; alt: string };
 }
 
 const STEP_BUTTON =
   "inline-flex size-11 items-center justify-center text-ink transition-colors duration-(--duration-micro) ease-brand hover:bg-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark disabled:text-ink-muted disabled:hover:bg-transparent";
 
-export function ProductPurchase({ product, whatsappHref, pots = [] }: ProductPurchaseProps) {
+export function ProductPurchase({ product, whatsappHref, pots = [], image }: ProductPurchaseProps) {
   const uid = useId();
   const readOnly = product.source === "sample";
   const first = product.variants.find((v) => v.available) ?? product.variants[0];
@@ -133,6 +135,14 @@ export function ProductPurchase({ product, whatsappHref, pots = [] }: ProductPur
       ) : (
         <p className="text-ink">{copy.unavailable}</p>
       )}
+
+      {variant?.available && !readOnly ? (
+        <p className="flex flex-wrap items-center gap-x-2 text-small">
+          <Icon name="check" size={16} className="text-primary-dark" />
+          <span className="font-medium">{copy.inStockLine}</span>
+          <span className="text-ink-muted">{copy.stockNote}</span>
+        </p>
+      ) : null}
 
       {product.options.map((option) => (
         <fieldset key={option.name} className="flex flex-col gap-2">
@@ -343,6 +353,11 @@ export function ProductPurchase({ product, whatsappHref, pots = [] }: ProductPur
             barVisible ? "translate-y-0" : "translate-y-full",
           )}
         >
+          {image ? (
+            <span className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-surface">
+              <Image src={image.src} alt="" fill sizes="48px" className="object-cover" />
+            </span>
+          ) : null}
           <div className="min-w-0 flex-1">
             <p className="truncate text-small font-medium">{product.title}</p>
             {variant ? (

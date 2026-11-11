@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { catalogCategories } from "@/content/catalog";
 import { sampleProducts } from "@/content/sample-products";
 import type { CatalogSlug, Product, ProductBadge } from "@/content/types";
+import { parseCare } from "@/lib/care";
 import { mediaUrl } from "@/lib/media";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/lib/db";
@@ -36,6 +37,7 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
         handle: products.handle,
         title: products.title,
         tags: products.tags,
+        care: products.care,
       })
       .from(products)
       .where(
@@ -74,11 +76,28 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
       const hover = images[1];
       if (!variant || !image) return [];
       const inStock = variants.some((v) => !v.trackInventory || v.allowBackorder || v.stock > 0);
+      const care = parseCare(row.care);
+      const lows = variants.filter(
+        (v) =>
+          v.trackInventory && !v.allowBackorder && v.stock > 0 && v.stock <= v.lowStockThreshold,
+      );
+      const prices = new Set(variants.map((v) => v.price));
       return [
         {
           id: row.handle,
+          care: {
+            light: care.light || undefined,
+            pet: care.pet || undefined,
+            level: care.level || undefined,
+          },
+          // Only when every purchasable variant is low, so the hint is never misleading.
+          lowStock:
+            lows.length > 0 && lows.length === variants.filter((v) => v.stock > 0).length
+              ? Math.min(...lows.map((v) => v.stock))
+              : undefined,
+          fromPrice: prices.size > 1,
           name: row.title,
-          price: variant.price / PAISA_PER_RUPEE,
+          price: Math.min(...variants.map((v) => v.price)) / PAISA_PER_RUPEE,
           compareAtPrice:
             variant.compareAtPrice === null ? undefined : variant.compareAtPrice / PAISA_PER_RUPEE,
           categories: row.tags.filter(isSlug),

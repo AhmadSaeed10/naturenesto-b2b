@@ -127,6 +127,12 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
     },
   ];
 
+  const faqItems: AccordionItem[] = copy.faq.map((entry, index) => ({
+    id: `faq-${index}`,
+    title: entry.q,
+    content: <p>{entry.a}</p>,
+  }));
+
   return (
     <article>
       <script
@@ -136,13 +142,6 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
       />
 
       <section className="relative overflow-hidden bg-surface">
-        {/* Oversized ghost title: decorative, the real h1 sits in the buy panel. */}
-        <p
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-24 text-center font-serif text-[clamp(4rem,13vw,12rem)] leading-none whitespace-nowrap text-ink/[0.07] select-none"
-        >
-          {product.title}
-        </p>
         <div className="relative mx-auto max-w-7xl px-4 pt-8 pb-12 md:px-8 md:pt-10 md:pb-20">
           <nav aria-label={copy.breadcrumb} className="mb-8">
             <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-ink-muted">
@@ -195,16 +194,17 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
                 </ul>
                 <SplitHeading as="h1" text={product.title} className="text-h1" />
               </div>
-              <ProductPurchase product={product} whatsappHref={whatsappHref} pots={pots} />
+              <ProductPurchase
+                product={product}
+                whatsappHref={whatsappHref}
+                pots={pots}
+                image={product.images[0]}
+              />
               <ul className="flex flex-col gap-3 border-t border-line pt-5 text-small">
-                {copy.trust.map((line, index) => (
-                  <li key={line} className="flex items-center gap-3">
-                    <Icon
-                      name={index === 0 ? "truck" : "whatsapp"}
-                      size={20}
-                      className="text-primary-dark"
-                    />
-                    {line}
+                {copy.trust.map((item) => (
+                  <li key={item.text} className="flex items-center gap-3">
+                    <Icon name={item.icon} size={20} className="text-primary-dark" />
+                    {item.text}
                   </li>
                 ))}
               </ul>
@@ -230,6 +230,8 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
         <Reveal className="flex flex-col gap-6">
           <h2 className="text-h3">{copy.knowHeading}</h2>
           <ProductAccordion items={knowItems} />
+          <h2 className="mt-10 text-h3">{copy.faqHeading}</h2>
+          <ProductAccordion items={faqItems} />
         </Reveal>
       </section>
 

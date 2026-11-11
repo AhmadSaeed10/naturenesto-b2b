@@ -11,6 +11,39 @@ export const shop = {
   empty: "No products here yet.",
   whatsappMessage: (name: string, price: string): string =>
     `Hi Nature Nesto, I'm interested in ${name} (${price}). Is it available?`,
+  // flag: card and filter wording is new, confirm with the client.
+  card: {
+    from: "From",
+    onlyLeft: (n: number) => `Only ${n} left`,
+    soldOut: "Sold out",
+    quickAdd: "Quick add",
+    chooseOptions: "Choose options",
+    careIcons: "Care at a glance",
+  },
+  filters: {
+    title: "Filter",
+    open: (n: number) => (n > 0 ? `Filter (${n})` : "Filter"),
+    sort: "Sort by",
+    sorts: {
+      featured: "Featured",
+      "price-asc": "Price, low to high",
+      "price-desc": "Price, high to low",
+      name: "Name",
+    },
+    light: "Light",
+    pets: "Pets",
+    level: "Care level",
+    petSafe: "Pet safe",
+    inStock: "In stock only",
+    clear: "Clear filters",
+    noMatch: "Nothing matches those filters.",
+    results: (n: number) => `${n} ${n === 1 ? "plant" : "plants"}`,
+  },
+  tile: {
+    title: "Not sure which plant suits your space?",
+    body: "Tell us about the light and the room. We will help you choose.",
+    cta: "Book a consultation",
+  },
   badges: {
     new: "New",
     "pet-safe": "Pet safe",

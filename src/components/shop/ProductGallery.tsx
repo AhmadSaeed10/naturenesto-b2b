@@ -102,7 +102,7 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
                   fill
                   priority={index === 0}
                   sizes="(min-width: 1024px) 48vw, 100vw"
-                  className="object-cover transition-transform duration-(--duration-reveal) ease-brand lg:group-hover/zoom:scale-[1.06]"
+                  className="object-cover mix-blend-multiply transition-transform duration-(--duration-reveal) ease-brand lg:group-hover/zoom:scale-[1.06]"
                 />
               </button>
             </li>
