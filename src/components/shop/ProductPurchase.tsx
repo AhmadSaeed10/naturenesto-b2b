@@ -11,7 +11,6 @@ import { shop } from "@/content/shop";
 import type { StoreProduct } from "@/lib/commerce/products";
 import type { PairingPot } from "@/lib/commerce/related";
 import Image from "next/image";
-import { formatPrice } from "@/lib/format";
 import { formatPaisa } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { CART_EVENT, openCart } from "./cart-events";
@@ -27,6 +26,11 @@ interface ProductPurchaseProps {
   /** First product photo, for the mobile sticky bar. */
   image?: { src: string; alt: string };
 }
+
+const CHOICE =
+  "flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 text-center text-small transition-colors duration-(--duration-micro) ease-brand has-focus-visible:outline-2 has-focus-visible:outline-offset-3 has-focus-visible:outline-primary-dark";
+const CHOICE_ON = "border-ink bg-surface font-medium text-ink";
+const CHOICE_OFF = "border-line text-ink hover:border-ink-muted";
 
 const STEP_BUTTON =
   "inline-flex size-11 items-center justify-center text-ink transition-colors duration-(--duration-micro) ease-brand hover:bg-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark disabled:text-ink-muted disabled:hover:bg-transparent";
@@ -116,13 +120,15 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
     ? copy.adding
     : chosenPot
       ? `${copy.addToCart} · ${formatPaisa(total)}`
-      : copy.addToCart;
+      : variant
+        ? `${copy.addToCart} · ${formatPaisa(total)}`
+        : copy.addToCart;
 
   return (
     <div className="flex flex-col gap-6">
       {variant ? (
         <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-serif text-h3">{formatPaisa(variant.price)}</span>
+          <span className="font-sans text-h4 font-medium">{formatPaisa(variant.price)}</span>
           {saving ? (
             <>
               <s className="text-lead text-ink-muted">{formatPaisa(variant.compareAtPrice ?? 0)}</s>
@@ -145,14 +151,17 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
       ) : null}
 
       {product.options.map((option) => (
-        <fieldset key={option.name} className="flex flex-col gap-2">
-          <legend className="mb-2 text-small font-medium">
-            {option.name}
+        <fieldset key={option.name} className="flex flex-col gap-3">
+          <legend className="mb-3 text-small">
+            <span className="font-medium">{copy.pick(option.name)}</span>
             {selected[option.name] ? (
-              <span className="font-normal text-ink-muted">: {selected[option.name]}</span>
+              <span className="font-serif text-base text-ink-muted italic">
+                {" "}
+                {selected[option.name]}
+              </span>
             ) : null}
           </legend>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-3">
             {option.values.map((value) => {
               const id = `${uid}-${option.name}-${value}`;
               const checked = selected[option.name] === value;
@@ -160,12 +169,7 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
                 <label
                   key={value}
                   htmlFor={id}
-                  className={cn(
-                    "inline-flex min-h-(--size-tap) cursor-pointer items-center rounded-pill border px-5 text-small transition-colors duration-(--duration-micro) has-focus-visible:outline-2 has-focus-visible:outline-offset-3 has-focus-visible:outline-primary-dark",
-                    checked
-                      ? "border-ink bg-ink text-background"
-                      : "border-line text-ink hover:border-ink",
-                  )}
+                  className={cn(CHOICE, checked ? CHOICE_ON : CHOICE_OFF)}
                 >
                   <input
                     id={id}
@@ -212,13 +216,16 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
       ) : (
         <div className="flex flex-col gap-3">
           {canBuy && pots.length > 0 ? (
-            <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1 flex w-full items-baseline justify-between text-small font-medium">
-                {copy.pairing.title}
-                <span className="font-normal text-ink-muted">{copy.pairing.optional}</span>
+            <fieldset className="flex flex-col gap-3">
+              <legend className="mb-3 text-small">
+                <span className="font-medium">{copy.pairing.title}:</span>
+                <span className="font-serif text-base text-ink-muted italic">
+                  {" "}
+                  {chosenPot ? chosenPot.name : copy.pairing.none}
+                </span>
               </legend>
-              <ul className="grid grid-cols-2 gap-2">
-                {pots.map((entry) => {
+              <ul className="grid grid-cols-3 gap-3">
+                {pots.slice(0, 3).map((entry) => {
                   const on = pot === entry.variantId;
                   return (
                     <li key={entry.variantId}>
@@ -227,30 +234,21 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
                         aria-pressed={on}
                         onClick={() => setPot(on ? null : entry.variantId)}
                         className={cn(
-                          "flex w-full items-center gap-3 rounded-2xl border p-2 text-left transition-colors duration-(--duration-micro) ease-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark",
-                          on ? "border-ink bg-background" : "border-line hover:border-ink",
+                          CHOICE,
+                          "w-full flex-col py-2 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-primary-dark",
+                          on ? CHOICE_ON : CHOICE_OFF,
                         )}
                       >
-                        <span className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-surface">
+                        <span className="relative size-10 overflow-hidden rounded-lg bg-surface">
                           <Image
                             src={entry.image}
                             alt=""
                             fill
-                            sizes="48px"
+                            sizes="40px"
                             className="object-cover"
                           />
                         </span>
-                        <span className="min-w-0 text-small">
-                          <span className="block truncate font-medium">{entry.name}</span>
-                          <span className="text-ink-muted">{formatPrice(entry.price)}</span>
-                        </span>
-                        {on ? (
-                          <Icon
-                            name="check"
-                            size={18}
-                            className="ml-auto shrink-0 text-primary-dark"
-                          />
-                        ) : null}
+                        <span className="line-clamp-1 text-[0.8125rem]">{entry.name}</span>
                       </button>
                     </li>
                   );
@@ -261,11 +259,11 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
 
           {canBuy ? (
             <>
-              <div className="flex flex-wrap items-center gap-3">
+              <div ref={cta} className="flex items-stretch gap-3">
                 <div
                   role="group"
                   aria-label={copy.quantity}
-                  className="inline-flex items-center rounded-pill border border-ink-muted"
+                  className="inline-flex shrink-0 items-center rounded-pill border border-line"
                 >
                   <button
                     type="button"
@@ -289,7 +287,7 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
                         Math.max(1, Math.min(maxQuantity, Number(event.target.value) || 1)),
                       )
                     }
-                    className="h-11 w-12 [appearance:textfield] bg-transparent text-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="h-11 w-10 [appearance:textfield] bg-transparent text-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
                   <button
                     type="button"
@@ -301,21 +299,20 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
                     <Icon name="plus" size={18} />
                   </button>
                 </div>
-              </div>
-              <div ref={cta} className="flex flex-col gap-3 sm:flex-row">
                 <Button type="button" onClick={add} disabled={pending} withArrow className="flex-1">
                   {buttonLabel}
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={buy}
-                  disabled={pending}
-                  className="flex-1"
-                >
-                  {copy.buyNow}
-                </Button>
               </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={buy}
+                disabled={pending}
+                className="w-full"
+              >
+                {copy.buyNow}
+              </Button>
+              <p className="text-small text-ink-muted">{copy.shipLine}</p>
             </>
           ) : (
             <p className="inline-flex min-h-(--size-tap) items-center font-medium text-ink-muted">
