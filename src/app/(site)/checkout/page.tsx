@@ -3,7 +3,8 @@ import { Suspense } from "react";
 import { CheckoutForm } from "@/components/shop/CheckoutForm";
 import { Button } from "@/components/ui/Button";
 import { commerce } from "@/content/commerce";
-import { quoteCart } from "@/lib/commerce/cart";
+import { backToCart } from "@/app/actions/cart";
+import { hasPreviousCart, quoteCart } from "@/lib/commerce/cart";
 import { checkoutDefaults, enabledPaymentMethods } from "@/lib/commerce/checkout-data";
 
 export const metadata: Metadata = { title: commerce.checkout.title, robots: { index: false } };
@@ -24,7 +25,25 @@ async function Checkout() {
       </div>
     );
   }
-  return <CheckoutForm initialQuote={quote} methods={methods} defaults={defaults} />;
+  return (
+    <div className="flex flex-col gap-8">
+      {(await hasPreviousCart()) ? (
+        <form
+          action={backToCart}
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-dashed border-ink/40 px-5 py-3 text-small"
+        >
+          <p>{commerce.cart.buyOnly}</p>
+          <button
+            type="submit"
+            className="inline-flex min-h-(--size-tap) items-center text-primary-dark underline underline-offset-4"
+          >
+            {commerce.cart.buyOnlyBack}
+          </button>
+        </form>
+      ) : null}
+      <CheckoutForm initialQuote={quote} methods={methods} defaults={defaults} />
+    </div>
+  );
 }
 
 export default function CheckoutPage() {

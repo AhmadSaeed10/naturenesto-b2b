@@ -49,6 +49,55 @@ export async function clearCartCookie(): Promise<void> {
   (await cookies()).delete(CART_COOKIE);
 }
 
+// "Buy now" checks out one item on its own cart. The shopper's usual cart is parked under
+// this cookie and handed back after the order or when they choose to return to it.
+export const PREVIOUS_CART_COOKIE = "nn_cart_prev";
+
+const cartCookie = (value: string) => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: CART_MAX_AGE,
+  value,
+});
+
+/** A fresh cart that becomes the current one. Returns its id. */
+export async function startBuyNowCart(): Promise<string> {
+  const jar = await cookies();
+  const current = await readCartToken();
+  if (current && !jar.get(PREVIOUS_CART_COOKIE)) {
+    jar.set(PREVIOUS_CART_COOKIE, current, cartCookie(current));
+  }
+  const [created] = await db()
+    .insert(carts)
+    .values({})
+    .returning({ id: carts.id, token: carts.token });
+  if (!created) throw new Error("Could not create a cart");
+  jar.set(CART_COOKIE, created.token, cartCookie(created.token));
+  return created.id;
+}
+
+export async function hasPreviousCart(): Promise<boolean> {
+  const value = (await cookies()).get(PREVIOUS_CART_COOKIE)?.value;
+  return token.safeParse(value).success;
+}
+
+/** Makes the parked cart current again (if it is still open) and forgets the buy now cart. */
+export async function restorePreviousCart(): Promise<void> {
+  const jar = await cookies();
+  const previous = jar.get(PREVIOUS_CART_COOKIE)?.value;
+  jar.delete(PREVIOUS_CART_COOKIE);
+  jar.delete(CART_COOKIE);
+  if (!previous || !token.safeParse(previous).success) return;
+  const [open] = await db()
+    .select({ id: carts.id })
+    .from(carts)
+    .where(and(eq(carts.token, previous), eq(carts.status, "open")))
+    .limit(1);
+  if (open) jar.set(CART_COOKIE, previous, cartCookie(previous));
+}
+
 export async function cartCount(): Promise<number> {
   const current = await readCartToken();
   if (!current || !commerceEnabled()) return 0;

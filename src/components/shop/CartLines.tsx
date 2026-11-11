@@ -8,7 +8,7 @@ import { setCartQuantity } from "@/app/actions/cart";
 import { commerce } from "@/content/commerce";
 import type { QuoteLine } from "@/lib/commerce/cart";
 import { formatPaisa } from "@/lib/money";
-import { CART_EVENT } from "./CartLink";
+import { CART_EVENT } from "./cart-events";
 
 const copy = commerce.cart;
 

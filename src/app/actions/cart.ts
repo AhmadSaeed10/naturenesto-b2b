@@ -3,7 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { RATE_LIMITS, clientIp, withinRateLimit } from "@/lib/rate-limit";
-import { commerceEnabled, ensureCart, readCartToken } from "@/lib/commerce/cart";
+import {
+  commerceEnabled,
+  ensureCart,
+  quoteCart,
+  readCartToken,
+  restorePreviousCart,
+  startBuyNowCart,
+} from "@/lib/commerce/cart";
+import { storedImageUrl } from "@/lib/media";
+import { redirect } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cartItems, carts, products, productVariants } from "@/lib/db/schema";
@@ -114,4 +123,77 @@ export async function setCartQuantity(variantId: string, quantity: number): Prom
     console.error("[cart] update failed", error instanceof Error ? error.message : error);
     return { ok: false, error: "failed" };
   }
+}
+
+export interface DrawerCart {
+  count: number;
+  subtotal: number;
+  blocked: boolean;
+  lines: {
+    variantId: string;
+    handle: string;
+    title: string;
+    variantTitle: string;
+    unitPrice: number;
+    quantity: number;
+    lineTotal: number;
+    max: number;
+    available: boolean;
+    image: string | null;
+  }[];
+}
+
+/** The cart as the slide-in drawer shows it. */
+export async function readCart(): Promise<DrawerCart> {
+  const empty: DrawerCart = { count: 0, subtotal: 0, blocked: false, lines: [] };
+  if (!commerceEnabled()) return empty;
+  const quote = await quoteCart();
+  if (!quote) return empty;
+  return {
+    count: quote.lines.reduce((sum, line) => sum + line.quantity, 0),
+    subtotal: quote.subtotal,
+    blocked: quote.unavailable.length > 0,
+    lines: quote.lines.map((line) => ({
+      variantId: line.variantId,
+      handle: line.handle,
+      title: line.title,
+      variantTitle: line.variantTitle,
+      unitPrice: line.unitPrice,
+      quantity: line.quantity,
+      lineTotal: line.lineTotal,
+      max:
+        line.trackInventory && !line.allowBackorder
+          ? Math.min(MAX_QUANTITY, line.stock)
+          : MAX_QUANTITY,
+      available: line.available,
+      image: storedImageUrl(line.image),
+    })),
+  };
+}
+
+/** Checks out one item on its own cart; the shopper's usual cart waits in the background. */
+export async function buyNow(variantId: string, quantity: number): Promise<CartResult> {
+  const blocked = await guard();
+  if (blocked) return blocked;
+  const variant = variantSchema.safeParse(variantId);
+  const qty = quantitySchema.safeParse(quantity);
+  if (!variant.success || !qty.success || qty.data === 0) return { ok: false, error: "invalid" };
+  const limit = await sellable(variant.data);
+  if (limit === null || limit === 0) return { ok: false, error: "unavailable" };
+  try {
+    const cartId = await startBuyNowCart();
+    await db()
+      .insert(cartItems)
+      .values({ cartId, variantId: variant.data, quantity: Math.min(limit, qty.data) });
+    return { ok: true, count: await count(cartId) };
+  } catch (error) {
+    console.error("[cart] buy now failed", error instanceof Error ? error.message : error);
+    return { ok: false, error: "failed" };
+  }
+}
+
+/** Leaves a buy now checkout and goes back to the usual cart. */
+export async function backToCart(): Promise<void> {
+  await restorePreviousCart();
+  redirect("/cart");
 }

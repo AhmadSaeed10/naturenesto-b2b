@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { addToCart } from "@/app/actions/cart";
 import { Icon } from "@/components/ui/Icon";
 import { commerce } from "@/content/commerce";
-import { CART_EVENT } from "./CartLink";
+import { CART_EVENT, openCart } from "./cart-events";
 
 const copy = commerce.product;
 
@@ -25,6 +25,7 @@ export function QuickAdd({ variantId, name }: QuickAddProps) {
       if (result.ok) {
         setState("added");
         window.dispatchEvent(new CustomEvent(CART_EVENT, { detail: result.count }));
+        openCart();
       } else {
         setState("failed");
       }
