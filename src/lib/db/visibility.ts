@@ -11,3 +11,7 @@ export function publishedNow(status: AnyPgColumn, publishedAt: AnyPgColumn): SQL
     or(isNull(publishedAt), lte(publishedAt, sql`now()`)),
   ) as SQL;
 }
+
+/** Products whose optional publish date has arrived (or that have none). */
+export const goneLive = (publishAt: AnyPgColumn): SQL =>
+  or(isNull(publishAt), lte(publishAt, sql`now()`)) as SQL;

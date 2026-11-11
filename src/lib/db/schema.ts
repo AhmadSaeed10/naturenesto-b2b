@@ -201,6 +201,19 @@ export const products = pgTable(
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
     care: jsonb().default({}).notNull(),
+    shortDescription: text("short_description"),
+    specs: jsonb().default([]).notNull(),
+    included: text()
+      .array()
+      .default(sql`'{}'::text[]`)
+      .notNull(),
+    relatedHandles: text("related_handles")
+      .array()
+      .default(sql`'{}'::text[]`)
+      .notNull(),
+    requiresShipping: boolean("requires_shipping").default(true).notNull(),
+    packageDims: jsonb("package_dims").default({}).notNull(),
+    publishAt: timestamp("publish_at", { withTimezone: true, mode: "date" }),
     publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
@@ -264,6 +277,8 @@ export const productVariants = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
     lowStockThreshold: integer("low_stock_threshold").default(3).notNull(),
+    barcode: text(),
+    imageMediaId: uuid("image_media_id"),
   },
   (table) => [
     index("product_variants_product_idx").using(
