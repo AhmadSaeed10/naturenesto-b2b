@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
+import { toRichText } from "@/lib/cms/rich-text";
 import { type ProductInput, productSchema } from "@/lib/admin/product-schema";
 import { ACCESS, staffWithRole } from "@/lib/auth/staff";
 import { inArray, sql } from "drizzle-orm";
@@ -42,7 +43,7 @@ export async function saveProduct(input: ProductInput): Promise<SaveProductResul
     id = await withActor(actor.id, async (tx) => {
       const payload = JSON.stringify({
         ...product,
-        description: { format: "plain", text: description },
+        description: toRichText(description),
       });
       const result = await tx.execute<{ id: string }>(
         sql`select public.save_product(${payload}::jsonb) as id`,

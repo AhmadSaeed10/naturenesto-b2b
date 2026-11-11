@@ -1,5 +1,6 @@
 import "server-only";
 import { parseCare } from "@/lib/care";
+import { richTextSource } from "@/lib/cms/rich-text";
 import { mediaUrl } from "@/lib/media";
 import {
   type SQL,
@@ -28,7 +29,7 @@ import {
   productVariants,
 } from "@/lib/db/schema";
 import { cleanSearch } from "./media";
-import { type ProductInput, descriptionText } from "./product-schema";
+import type { ProductInput } from "./product-schema";
 import { type MediaPickerOption, type PickerOption, parseRules } from "./products-shared";
 
 export {
@@ -189,6 +190,8 @@ export async function listProducts({
 }
 
 export interface EditorVariant {
+  barcode: string;
+  image_media_id: string | null;
   id: string | null;
   title: string;
   sku: string;
@@ -227,6 +230,31 @@ const asStringRecord = (value: Json): Record<string, string> =>
         ),
       )
     : {};
+
+function asSpecs(value: Json): { label: string; value: string }[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) =>
+    row &&
+    typeof row === "object" &&
+    !Array.isArray(row) &&
+    typeof row.label === "string" &&
+    typeof row.value === "string"
+      ? [{ label: row.label, value: row.value }]
+      : [],
+  );
+}
+
+function asDims(value: Json): {
+  length: number | null;
+  width: number | null;
+  height: number | null;
+} {
+  const read = (key: string): number | null =>
+    value && typeof value === "object" && !Array.isArray(value) && typeof value[key] === "number"
+      ? value[key]
+      : null;
+  return { length: read("length"), width: read("width"), height: read("height") };
+}
 
 export async function getProductForEditor(id: string): Promise<EditorProduct | null> {
   const [data] = await db().select().from(products).where(eq(products.id, id)).limit(1);
@@ -270,7 +298,14 @@ export async function getProductForEditor(id: string): Promise<EditorProduct | n
     id: data.id,
     title: data.title,
     handle: data.handle,
-    description: descriptionText(data.description as Json),
+    description: richTextSource(data.description as Json),
+    short_description: data.shortDescription ?? "",
+    specs: asSpecs(data.specs as Json),
+    included: data.included,
+    related_handles: data.relatedHandles,
+    requires_shipping: data.requiresShipping,
+    package_dims: asDims(data.packageDims as Json),
+    publish_at: data.publishAt ? data.publishAt.toISOString() : "",
     status: data.status,
     vendor: data.vendor ?? "",
     product_type: data.productType ?? "",
@@ -292,6 +327,8 @@ export async function getProductForEditor(id: string): Promise<EditorProduct | n
       allow_backorder: variant.allowBackorder,
       low_stock_threshold: variant.lowStockThreshold,
       initial_stock: 0,
+      barcode: variant.barcode ?? "",
+      image_media_id: variant.imageMediaId,
       stock: variant.stock,
     })),
     images: imageRows.map((image) => ({
@@ -311,8 +348,9 @@ export async function getEditorOptions(): Promise<{
   manualCollections: PickerOption[];
   categories: PickerOption[];
   media: MediaPickerOption[];
+  relatedChoices: PickerOption[];
 }> {
-  const [collectionRows, categoryRows, mediaRows] = await Promise.all([
+  const [collectionRows, categoryRows, mediaRows, productRows] = await Promise.all([
     db()
       .select({ id: collections.id, title: collections.title })
       .from(collections)
@@ -323,10 +361,18 @@ export async function getEditorOptions(): Promise<{
       .from(categories)
       .orderBy(asc(categories.position), asc(categories.name)),
     db().select().from(mediaAssets).orderBy(desc(mediaAssets.createdAt)).limit(300),
+    db()
+      .select({ handle: products.handle, title: products.title })
+      .from(products)
+      .where(isNull(products.deletedAt))
+      .orderBy(asc(products.title))
+      .limit(500),
   ]);
   return {
     manualCollections: collectionRows.map((row) => ({ id: row.id, label: row.title })),
     categories: categoryRows.map((row) => ({ id: row.id, label: row.name })),
+    // The id here is the product handle, which is what the related list stores.
+    relatedChoices: productRows.map((row) => ({ id: row.handle, label: row.title })),
     media: mediaRows.map((row) => ({
       id: row.id,
       label: row.title || row.alt || row.externalUrl || row.storagePath || row.id,

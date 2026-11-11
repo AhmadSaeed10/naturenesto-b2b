@@ -13,6 +13,7 @@ import {
   TextArea,
   TextInput,
 } from "@/components/admin/fields";
+import { RichTextEditor } from "@/components/admin/content/RichTextEditor";
 import { Button } from "@/components/ui/Button";
 import { admin } from "@/content/admin";
 import { EMPTY_CARE, type Care } from "@/lib/care";
@@ -51,6 +52,8 @@ interface VariantDraft {
   threshold: string;
   initialStock: string;
   stock: number;
+  barcode: string;
+  imageId: string;
 }
 
 let draftKey = 0;
@@ -72,6 +75,8 @@ function toDraft(variant: EditorVariant): VariantDraft {
     threshold: String(variant.low_stock_threshold),
     initialStock: String(variant.initial_stock),
     stock: variant.stock,
+    barcode: variant.barcode,
+    imageId: variant.image_media_id ?? "",
   };
 }
 
@@ -94,7 +99,23 @@ const blankVariant = (
   threshold: "3",
   initialStock: "0",
   stock: 0,
+  barcode: "",
+  imageId: "",
 });
+
+/** ISO time to the value a datetime-local input expects, in the viewer's time zone. */
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+const toNumber = (text: string): number | null => {
+  const value = Number.parseFloat(text);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+};
 
 const splitValues = (text: string): string[] => [
   ...new Set(
@@ -114,6 +135,14 @@ interface ProductEditorProps {
   manualCollections: PickerOption[];
   categories: PickerOption[];
   media: MediaPickerOption[];
+  /** Products that can be picked as related; the id is the product handle. */
+  relatedChoices?: PickerOption[];
+}
+
+interface SpecDraft {
+  key: string;
+  label: string;
+  value: string;
 }
 
 type ErrorKey = keyof typeof copy.errors;
@@ -124,6 +153,7 @@ export function ProductEditor({
   manualCollections,
   categories,
   media,
+  relatedChoices = [],
 }: ProductEditorProps) {
   const router = useRouter();
   const uid = useId();
@@ -133,6 +163,20 @@ export function ProductEditor({
   const [handle, setHandle] = useState(product?.handle ?? "");
   const [handleTouched, setHandleTouched] = useState(!isNew);
   const [description, setDescription] = useState(product?.description ?? "");
+  const [shortDescription, setShortDescription] = useState(product?.short_description ?? "");
+  const [specs, setSpecs] = useState<SpecDraft[]>(
+    (product?.specs ?? []).map((spec) => ({ key: nextKey(), ...spec })),
+  );
+  const [included, setIncluded] = useState((product?.included ?? []).join("\n"));
+  const [related, setRelated] = useState<string[]>(product?.related_handles ?? []);
+  const [relatedQuery, setRelatedQuery] = useState("");
+  const [requiresShipping, setRequiresShipping] = useState(product?.requires_shipping ?? true);
+  const [dims, setDims] = useState({
+    length: String(product?.package_dims?.length ?? ""),
+    width: String(product?.package_dims?.width ?? ""),
+    height: String(product?.package_dims?.height ?? ""),
+  });
+  const [publishAt, setPublishAt] = useState(toLocalInput(product?.publish_at));
   const [status, setStatus] = useState<ProductInput["status"]>(product?.status ?? "draft");
   const [vendor, setVendor] = useState(product?.vendor ?? "");
   const [productType, setProductType] = useState(product?.product_type ?? "");
@@ -229,6 +273,8 @@ export function ProductEditor({
         allow_backorder: variant.backorder,
         low_stock_threshold: threshold,
         initial_stock: variant.id ? 0 : initial,
+        barcode: variant.barcode,
+        image_media_id: variant.imageId || null,
       };
     });
     setBadVariants(invalidVariants);
@@ -248,6 +294,22 @@ export function ProductEditor({
       seo_title: seoTitle,
       seo_description: seoDescription,
       care,
+      short_description: shortDescription,
+      specs: specs
+        .map((spec) => ({ label: spec.label.trim(), value: spec.value.trim() }))
+        .filter((spec) => spec.label && spec.value),
+      included: included
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+      related_handles: related,
+      requires_shipping: requiresShipping,
+      package_dims: {
+        length: toNumber(dims.length),
+        width: toNumber(dims.width),
+        height: toNumber(dims.height),
+      },
+      publish_at: publishAt ? new Date(publishAt).toISOString() : "",
       options: optionList,
       variants: built,
       images: images.map((image) => ({ media_id: image.media_id, alt: image.alt })),
@@ -356,12 +418,22 @@ export function ProductEditor({
               onBlur={() => setHandle((value) => toHandle(value))}
             />
             <TextArea
+              id={`${uid}-short`}
+              label={copy.extra.shortDescription}
+              hint={copy.extra.shortDescriptionHint}
+              value={shortDescription}
+              maxLength={300}
+              rows={2}
+              onChange={(event) => setShortDescription(event.target.value)}
+            />
+            <RichTextEditor
               id={`${uid}-description`}
               label={copy.fields.description}
-              hint={copy.fields.descriptionHint}
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={setDescription}
+              rows={10}
             />
+            <p className="text-xs text-ink-muted">{copy.fields.descriptionHint}</p>
           </AdminCard>
 
           <AdminCard title={copy.sections.media} description={copy.media.dragHint}>
@@ -517,6 +589,33 @@ export function ProductEditor({
                         }
                       />
                     </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <TextInput
+                        id={`${id}-barcode`}
+                        label={copy.extra.barcode}
+                        value={variant.barcode}
+                        onChange={(event) =>
+                          updateVariant(variant.key, { barcode: event.target.value })
+                        }
+                      />
+                      {images.length > 0 ? (
+                        <SelectInput
+                          id={`${id}-image`}
+                          label={copy.extra.variantImage}
+                          value={variant.imageId}
+                          onChange={(event) =>
+                            updateVariant(variant.key, { imageId: event.target.value })
+                          }
+                        >
+                          <option value="">{copy.extra.variantImageNone}</option>
+                          {images.map((image, index) => (
+                            <option key={image.media_id} value={image.media_id}>
+                              {index + 1}. {image.label || image.alt || image.media_id.slice(0, 8)}
+                            </option>
+                          ))}
+                        </SelectInput>
+                      ) : null}
+                    </div>
                     <div className="flex flex-wrap items-center gap-x-6">
                       <Checkbox
                         id={`${id}-track`}
@@ -551,6 +650,96 @@ export function ProductEditor({
                 );
               })}
             </ul>
+          </AdminCard>
+
+          <AdminCard title={copy.sections.specs} description={copy.extra.specsHint}>
+            <ul className="flex flex-col gap-3">
+              {specs.map((spec) => (
+                <li
+                  key={spec.key}
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+                >
+                  <TextInput
+                    id={`${uid}-spec-${spec.key}-label`}
+                    label={copy.extra.specLabel}
+                    value={spec.label}
+                    onChange={(event) =>
+                      setSpecs((list) =>
+                        list.map((row) =>
+                          row.key === spec.key ? { ...row, label: event.target.value } : row,
+                        ),
+                      )
+                    }
+                  />
+                  <TextInput
+                    id={`${uid}-spec-${spec.key}-value`}
+                    label={copy.extra.specValue}
+                    value={spec.value}
+                    onChange={(event) =>
+                      setSpecs((list) =>
+                        list.map((row) =>
+                          row.key === spec.key ? { ...row, value: event.target.value } : row,
+                        ),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={TEXT_BUTTON}
+                    onClick={() => setSpecs((list) => list.filter((row) => row.key !== spec.key))}
+                  >
+                    {copy.extra.specRemove}
+                    <span className="sr-only">: {spec.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div>
+              <button
+                type="button"
+                className={OUTLINE_BUTTON}
+                onClick={() =>
+                  setSpecs((list) => [...list, { key: nextKey(), label: "", value: "" }])
+                }
+              >
+                {copy.extra.specAdd}
+              </button>
+            </div>
+          </AdminCard>
+
+          <AdminCard title={copy.sections.included}>
+            <TextArea
+              id={`${uid}-included`}
+              label={copy.extra.included}
+              hint={copy.extra.includedHint}
+              value={included}
+              rows={4}
+              onChange={(event) => setIncluded(event.target.value)}
+            />
+          </AdminCard>
+
+          <AdminCard title={copy.sections.shipping}>
+            <Checkbox
+              id={`${uid}-ships`}
+              label={copy.extra.requiresShipping}
+              checked={requiresShipping}
+              onChange={(event) => setRequiresShipping(event.target.checked)}
+            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {(["length", "width", "height"] as const).map((key) => (
+                <TextInput
+                  key={key}
+                  id={`${uid}-dim-${key}`}
+                  label={copy.extra[key]}
+                  inputMode="decimal"
+                  value={dims[key]}
+                  onChange={(event) =>
+                    setDims((current) => ({ ...current, [key]: event.target.value }))
+                  }
+                />
+              ))}
+            </div>
+            <p className="text-xs text-ink-muted">{copy.extra.dimsHint}</p>
           </AdminCard>
 
           <AdminCard title={copy.sections.care}>
@@ -630,6 +819,42 @@ export function ProductEditor({
                 </option>
               ))}
             </SelectInput>
+            <TextInput
+              id={`${uid}-publish`}
+              label={copy.extra.publishAt}
+              hint={copy.extra.publishHint}
+              type="datetime-local"
+              value={publishAt}
+              onChange={(event) => setPublishAt(event.target.value)}
+            />
+          </AdminCard>
+
+          <AdminCard title={copy.sections.related} description={copy.extra.relatedHint}>
+            <TextInput
+              id={`${uid}-related-q`}
+              label={copy.extra.relatedSearch}
+              value={relatedQuery}
+              onChange={(event) => setRelatedQuery(event.target.value)}
+            />
+            <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+              {relatedChoices
+                .filter(
+                  (choice) =>
+                    choice.id !== handle &&
+                    (related.includes(choice.id) ||
+                      choice.label.toLowerCase().includes(relatedQuery.trim().toLowerCase())),
+                )
+                .slice(0, 60)
+                .map((choice) => (
+                  <Checkbox
+                    key={choice.id}
+                    id={`${uid}-related-${choice.id}`}
+                    label={choice.label}
+                    checked={related.includes(choice.id)}
+                    onChange={() => setRelated((list) => toggleIn(list, choice.id))}
+                  />
+                ))}
+            </div>
           </AdminCard>
 
           <AdminCard title={copy.sections.organisation}>

@@ -30,7 +30,13 @@ const variantSchema = z.object({
   low_stock_threshold: z.number().int().min(0).max(100_000),
   /** Only used when the variant is created; later changes go through adjust_stock. */
   initial_stock: z.number().int().min(0).max(1_000_000),
+  /** Optional. Left out by the CSV import, which then keeps the stored value. */
+  barcode: z.string().trim().max(64).optional(),
+  /** One of this product's images, shown in the gallery when the variant is picked. */
+  image_media_id: z.uuid().nullable().optional(),
 });
+
+const cm = z.number().min(0).max(1000).nullable();
 
 export const productSchema = z
   .object({
@@ -49,6 +55,26 @@ export const productSchema = z
     seo_description: z.string().trim().max(170),
     /** Omitted by the CSV import, which then leaves the stored care alone. */
     care: careSchema.optional(),
+    /** Fuller product facts, all optional. Left out by the CSV import, which keeps stored values. */
+    short_description: z.string().trim().max(300).optional(),
+    specs: z
+      .array(
+        z.object({
+          label: z.string().trim().min(1).max(60),
+          value: z.string().trim().min(1).max(200),
+        }),
+      )
+      .max(30)
+      .optional(),
+    included: z.array(z.string().trim().min(1).max(120)).max(30).optional(),
+    related_handles: z.array(z.string().max(100).regex(HANDLE_PATTERN)).max(12).optional(),
+    requires_shipping: z.boolean().optional(),
+    package_dims: z.object({ length: cm, width: cm, height: cm }).optional(),
+    /** ISO time the product goes live; empty or null means as soon as it is active. */
+    publish_at: z
+      .union([z.literal(""), z.iso.datetime({ offset: true })])
+      .nullable()
+      .optional(),
     options: z.array(optionSchema).max(MAX_OPTIONS),
     variants: z.array(variantSchema).min(1).max(MAX_VARIANTS),
     images: z
@@ -79,6 +105,12 @@ export const productSchema = z
       }
       seen.add(key);
     });
+    const imageIds = new Set(product.images.map((image) => image.media_id));
+    product.variants.forEach((variant, index) => {
+      if (variant.image_media_id && !imageIds.has(variant.image_media_id)) {
+        ctx.addIssue({ code: "custom", path: ["variants", index], message: "variant image" });
+      }
+    });
     const skus = product.variants.map((variant) => variant.sku).filter(Boolean);
     if (new Set(skus).size !== skus.length) {
       ctx.addIssue({ code: "custom", path: ["variants"], message: "duplicate sku" });
@@ -97,8 +129,9 @@ export interface PlainDescription {
 
 export function descriptionText(value: unknown): string {
   if (typeof value === "string") return value;
-  if (value && typeof value === "object" && "text" in value && typeof value.text === "string") {
-    return value.text;
+  if (value && typeof value === "object") {
+    if ("source" in value && typeof value.source === "string") return value.source;
+    if ("text" in value && typeof value.text === "string") return value.text;
   }
   return "";
 }
