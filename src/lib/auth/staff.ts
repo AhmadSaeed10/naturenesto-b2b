@@ -61,6 +61,8 @@ export const ACCESS = {
   media: ["owner", "admin", "editor"],
   catalog: ["owner", "admin", "editor"],
   content: ["owner", "admin", "editor"],
+  orders: ["owner", "admin", "support"],
+  customers: ["owner", "admin", "support"],
   redirects: ["owner", "admin"],
   storeSettings: ["owner", "admin"],
   staff: ["owner", "admin"],
