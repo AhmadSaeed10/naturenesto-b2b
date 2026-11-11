@@ -159,6 +159,17 @@
   }
 }
 
+@theme {
+  --animate-accordion-in: accordion-in var(--duration-micro) var(--ease-brand) both;
+
+  @keyframes accordion-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+}
+
 /* Hidden before first paint by the inline script in the root layout. */
 html[data-announcement="dismissed"] [data-announcement-bar] {
   display: none;

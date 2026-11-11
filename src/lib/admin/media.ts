@@ -1,7 +1,9 @@
 import "server-only";
 import { MEDIA_PAGE_SIZE } from "@/lib/media-rules";
 import { mediaUrl } from "@/lib/media";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { desc, ilike, or, sql } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { mediaAssets } from "@/lib/db/schema";
 
 export interface MediaItem {
   id: string;
@@ -23,10 +25,7 @@ export interface MediaPage {
   pageCount: number;
 }
 
-/**
- * Search terms keep letters, numbers, spaces and simple punctuation only. That rules out
- * LIKE wildcards and the characters PostgREST filter syntax treats specially.
- */
+/** Search terms keep letters, numbers, spaces and simple punctuation only: no LIKE wildcards. */
 export const cleanSearch = (value: string): string =>
   value
     .replace(/[^\p{L}\p{N}\s.'-]/gu, " ")
@@ -41,29 +40,38 @@ export async function listMedia({
   query: string;
   page: number;
 }): Promise<MediaPage> {
-  const supabase = await createSupabaseServerClient();
   const from = (page - 1) * MEDIA_PAGE_SIZE;
-
-  let request = supabase
-    .from("media_assets")
-    .select("id, external_url, storage_path, title, alt, decorative, width, height, mime_type", {
-      count: "exact",
-    })
-    .order("created_at", { ascending: false })
-    .range(from, from + MEDIA_PAGE_SIZE - 1);
   const term = cleanSearch(query);
-  if (term) request = request.or(`title.ilike."%${term}%",alt.ilike."%${term}%"`);
+  const where = term
+    ? or(ilike(mediaAssets.title, `%${term}%`), ilike(mediaAssets.alt, `%${term}%`))
+    : undefined;
 
-  const { data, count, error } = await request;
-  if (error) throw new Error(`Could not load media: ${error.message}`);
+  const [data, [counted]] = await Promise.all([
+    db()
+      .select()
+      .from(mediaAssets)
+      .where(where)
+      .orderBy(desc(mediaAssets.createdAt))
+      .limit(MEDIA_PAGE_SIZE)
+      .offset(from),
+    db()
+      .select({ n: sql<number>`count(*)::int` })
+      .from(mediaAssets)
+      .where(where),
+  ]);
 
   const ids = data.map((row) => row.id);
-  const { data: usage } = ids.length
-    ? await supabase.rpc("media_usage", { p_media_ids: ids })
-    : { data: [] };
-  const usesById = new Map((usage ?? []).map((row) => [row.media_id, Number(row.uses)]));
+  const usage = ids.length
+    ? await db().execute<{ media_id: string; uses: string }>(
+        sql`select media_id, uses from public.media_usage(array[${sql.join(
+          ids.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )}]::uuid[])`,
+      )
+    : { rows: [] };
+  const usesById = new Map(usage.rows.map((row) => [row.media_id, Number(row.uses)]));
 
-  const total = count ?? 0;
+  const total = counted?.n ?? 0;
   return {
     items: data.map((row) => ({
       id: row.id,
@@ -73,8 +81,8 @@ export async function listMedia({
       decorative: row.decorative,
       width: row.width,
       height: row.height,
-      mimeType: row.mime_type,
-      isExternal: row.external_url !== null,
+      mimeType: row.mimeType,
+      isExternal: row.externalUrl !== null,
       uses: usesById.get(row.id) ?? 0,
     })),
     total,
@@ -85,14 +93,19 @@ export async function listMedia({
 
 /** Lightweight list for pickers (logo, covers): newest first, images with a usable URL. */
 export async function listMediaOptions(): Promise<{ id: string; label: string }[]> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("media_assets")
-    .select("id, title, alt, storage_path, external_url")
-    .order("created_at", { ascending: false })
+  const rows = await db()
+    .select({
+      id: mediaAssets.id,
+      title: mediaAssets.title,
+      alt: mediaAssets.alt,
+      storagePath: mediaAssets.storagePath,
+      externalUrl: mediaAssets.externalUrl,
+    })
+    .from(mediaAssets)
+    .orderBy(desc(mediaAssets.createdAt))
     .limit(200);
-  return (data ?? []).map((row) => ({
+  return rows.map((row) => ({
     id: row.id,
-    label: row.title || row.alt || row.storage_path || row.external_url || row.id,
+    label: row.title || row.alt || row.storagePath || row.externalUrl || row.id,
   }));
 }

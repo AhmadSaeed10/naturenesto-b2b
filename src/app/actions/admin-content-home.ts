@@ -1,7 +1,7 @@
 "use server";
 
+import { and, eq } from "drizzle-orm";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { z } from "zod";
 import { ACCESS, staffWithRole } from "@/lib/auth/staff";
 import {
   HOME_SECTION_ORDER,
@@ -10,33 +10,28 @@ import {
   sectionSchemas,
 } from "@/lib/cms/sections";
 import { CMS_TAGS } from "@/lib/cms/tags";
-import type { Json } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { type Transaction, withActor } from "@/lib/db";
+import { pageSectionDrafts, pageSections, pages } from "@/lib/db/schema";
 
 export type SectionResult =
   { ok: true } | { ok: false; error: "invalid" | "forbidden" | "failed"; paths?: string[] };
 
-type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
-
-async function homePageId(supabase: ServerClient): Promise<string | null> {
-  const { data } = await supabase.from("pages").select("id").eq("handle", "home").maybeSingle();
-  return data?.id ?? null;
-}
-
-async function sectionRow(supabase: ServerClient, type: HomeSectionType) {
-  const pageId = await homePageId(supabase);
-  if (!pageId) return null;
-  const { data } = await supabase
-    .from("page_sections")
-    .select("id, status, page_section_drafts (data)")
-    .eq("page_id", pageId)
-    .eq("type", type)
-    .maybeSingle();
+async function sectionRow(tx: Transaction, type: HomeSectionType) {
+  const [page] = await tx
+    .select({ id: pages.id })
+    .from(pages)
+    .where(eq(pages.handle, "home"))
+    .limit(1);
+  if (!page) return null;
+  const [row] = await tx
+    .select({ id: pageSections.id, status: pageSections.status, draft: pageSectionDrafts.data })
+    .from(pageSections)
+    .leftJoin(pageSectionDrafts, eq(pageSectionDrafts.sectionId, pageSections.id))
+    .where(and(eq(pageSections.pageId, page.id), eq(pageSections.type, type)))
+    .limit(1);
   return {
-    pageId,
-    row: data
-      ? { id: data.id, status: data.status, draft: data.page_section_drafts?.data ?? null }
-      : null,
+    pageId: page.id,
+    row: row ? { id: row.id, status: row.status, draft: row.draft ?? null } : null,
   };
 }
 
@@ -47,7 +42,8 @@ function refresh(type: HomeSectionType) {
 
 /** Saves edits as a draft; the live homepage keeps showing the published data. */
 export async function saveSectionDraft(type: string, data: unknown): Promise<SectionResult> {
-  if (!(await staffWithRole(ACCESS.content))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.content);
+  if (!actor) return { ok: false, error: "forbidden" };
   if (!isHomeSectionType(type)) return { ok: false, error: "invalid" };
   const parsed = sectionSchemas[type].safeParse(data);
   if (!parsed.success) {
@@ -57,92 +53,108 @@ export async function saveSectionDraft(type: string, data: unknown): Promise<Sec
       paths: parsed.error.issues.map((issue) => issue.path.join(".")),
     };
   }
+  const draft = parsed.data as unknown as Record<string, unknown>;
 
-  const supabase = await createSupabaseServerClient();
-  const found = await sectionRow(supabase, type);
-  if (!found) return { ok: false, error: "failed" };
-  const draft = parsed.data as unknown as Json;
-  let sectionId = found.row?.id;
-  if (!sectionId) {
-    // A section missing from the seed starts hidden, with the draft as its data.
-    const created = await supabase
-      .from("page_sections")
-      .insert({
-        page_id: found.pageId,
-        type,
-        position: HOME_SECTION_ORDER.indexOf(type),
-        data: draft,
-        status: "draft",
-      })
-      .select("id")
-      .single();
-    if (created.error)
-      return { ok: false, error: created.error.code === "42501" ? "forbidden" : "failed" };
-    sectionId = created.data.id;
-  }
-  const { error } = await supabase
-    .from("page_section_drafts")
-    .upsert({ section_id: sectionId, data: draft }, { onConflict: "section_id" });
-  if (error) {
-    console.error("[content] draft save failed", error.message);
-    return { ok: false, error: error.code === "42501" ? "forbidden" : "failed" };
+  try {
+    const done = await withActor(actor.id, async (tx) => {
+      const found = await sectionRow(tx, type);
+      if (!found) return false;
+      let sectionId = found.row?.id;
+      if (!sectionId) {
+        // A section missing from the seed starts hidden, with the draft as its data.
+        const [created] = await tx
+          .insert(pageSections)
+          .values({
+            pageId: found.pageId,
+            type,
+            position: HOME_SECTION_ORDER.indexOf(type),
+            data: draft,
+            status: "draft",
+          })
+          .returning({ id: pageSections.id });
+        sectionId = created?.id;
+      }
+      if (!sectionId) return false;
+      await tx
+        .insert(pageSectionDrafts)
+        .values({ sectionId, data: draft })
+        .onConflictDoUpdate({ target: pageSectionDrafts.sectionId, set: { data: draft } });
+      return true;
+    });
+    if (!done) return { ok: false, error: "failed" };
+  } catch (error) {
+    console.error("[content] draft save failed", error instanceof Error ? error.message : error);
+    return { ok: false, error: "failed" };
   }
   refresh(type);
   return { ok: true };
 }
 
-const typeSchema = z.string().refine(isHomeSectionType);
-
 export async function publishSection(type: string): Promise<SectionResult> {
-  if (!(await staffWithRole(ACCESS.content))) return { ok: false, error: "forbidden" };
-  if (!typeSchema.safeParse(type).success || !isHomeSectionType(type))
-    return { ok: false, error: "invalid" };
-  const supabase = await createSupabaseServerClient();
-  const found = await sectionRow(supabase, type);
-  if (!found?.row?.draft) return { ok: false, error: "invalid" };
-  // Re-validate on publish: the schema may have tightened since the draft was saved.
-  if (!sectionSchemas[type].safeParse(found.row.draft).success)
-    return { ok: false, error: "invalid" };
-
-  const { error } = await supabase
-    .from("page_sections")
-    .update({ data: found.row.draft })
-    .eq("id", found.row.id);
-  if (error) return { ok: false, error: "failed" };
-  // Clearing the draft is cosmetic once data holds it; a failure leaves a harmless copy.
-  await supabase.from("page_section_drafts").delete().eq("section_id", found.row.id);
+  const actor = await staffWithRole(ACCESS.content);
+  if (!actor) return { ok: false, error: "forbidden" };
+  if (!isHomeSectionType(type)) return { ok: false, error: "invalid" };
+  try {
+    const result = await withActor(actor.id, async (tx): Promise<SectionResult> => {
+      const found = await sectionRow(tx, type);
+      if (!found?.row?.draft) return { ok: false, error: "invalid" };
+      // Re-validate on publish: the schema may have tightened since the draft was saved.
+      if (!sectionSchemas[type].safeParse(found.row.draft).success)
+        return { ok: false, error: "invalid" };
+      await tx
+        .update(pageSections)
+        .set({ data: found.row.draft })
+        .where(eq(pageSections.id, found.row.id));
+      await tx.delete(pageSectionDrafts).where(eq(pageSectionDrafts.sectionId, found.row.id));
+      return { ok: true };
+    });
+    if (!result.ok) return result;
+  } catch {
+    return { ok: false, error: "failed" };
+  }
   revalidateTag(CMS_TAGS.home, "max");
   refresh(type);
   return { ok: true };
 }
 
 export async function discardSectionDraft(type: string): Promise<SectionResult> {
-  if (!(await staffWithRole(ACCESS.content))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.content);
+  if (!actor) return { ok: false, error: "forbidden" };
   if (!isHomeSectionType(type)) return { ok: false, error: "invalid" };
-  const supabase = await createSupabaseServerClient();
-  const found = await sectionRow(supabase, type);
-  if (!found?.row) return { ok: false, error: "invalid" };
-  const { error } = await supabase
-    .from("page_section_drafts")
-    .delete()
-    .eq("section_id", found.row.id);
-  if (error) return { ok: false, error: "failed" };
+  try {
+    const result = await withActor(actor.id, async (tx): Promise<SectionResult> => {
+      const found = await sectionRow(tx, type);
+      if (!found?.row) return { ok: false, error: "invalid" };
+      await tx.delete(pageSectionDrafts).where(eq(pageSectionDrafts.sectionId, found.row.id));
+      return { ok: true };
+    });
+    if (!result.ok) return result;
+  } catch {
+    return { ok: false, error: "failed" };
+  }
   refresh(type);
   return { ok: true };
 }
 
 /** Hidden sections keep status draft, which the public cannot read. */
 export async function setSectionVisible(type: string, visible: boolean): Promise<SectionResult> {
-  if (!(await staffWithRole(ACCESS.content))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.content);
+  if (!actor) return { ok: false, error: "forbidden" };
   if (!isHomeSectionType(type)) return { ok: false, error: "invalid" };
-  const supabase = await createSupabaseServerClient();
-  const found = await sectionRow(supabase, type);
-  if (!found?.row) return { ok: false, error: "invalid" };
-  const { error } = await supabase
-    .from("page_sections")
-    .update({ status: visible ? "published" : "draft" })
-    .eq("id", found.row.id);
-  if (error) return { ok: false, error: "failed" };
+  try {
+    const result = await withActor(actor.id, async (tx): Promise<SectionResult> => {
+      const found = await sectionRow(tx, type);
+      if (!found?.row) return { ok: false, error: "invalid" };
+      await tx
+        .update(pageSections)
+        .set({ status: visible ? "published" : "draft" })
+        .where(eq(pageSections.id, found.row.id));
+      return { ok: true };
+    });
+    if (!result.ok) return result;
+  } catch {
+    return { ok: false, error: "failed" };
+  }
   revalidateTag(CMS_TAGS.home, "max");
   refresh(type);
   return { ok: true };

@@ -1,9 +1,8 @@
-// Shared by proxy.ts, the auth callback and sign in pages so the routes stay in one place.
+// Shared by proxy.ts, the auth actions and sign in pages so the routes stay in one place.
 export const ADMIN_HOME = "/admin";
 export const ADMIN_LOGIN = "/admin/login";
 export const ACCOUNT_HOME = "/account";
 export const ACCOUNT_LOGIN = "/account/login";
-export const AUTH_CALLBACK = "/auth/callback";
 
 const within = (value: string, root: string): boolean =>
   value === root || value.startsWith(`${root}/`) || value.startsWith(`${root}?`);
@@ -14,7 +13,7 @@ export function safeAdminNext(value: string | null | undefined): string {
   return value;
 }
 
-/** Post-login destination for the shared callback: an admin or account path, never elsewhere. */
+/** Post-login destination for a magic link: an admin or account path, never elsewhere. */
 export function safeNext(value: string | null | undefined): string {
   if (
     value &&

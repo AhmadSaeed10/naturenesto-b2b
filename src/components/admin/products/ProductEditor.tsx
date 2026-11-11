@@ -15,6 +15,7 @@ import {
 } from "@/components/admin/fields";
 import { Button } from "@/components/ui/Button";
 import { admin } from "@/content/admin";
+import { EMPTY_CARE, type Care } from "@/lib/care";
 import { MAX_OPTIONS, type ProductInput, optionCombinations } from "@/lib/admin/product-schema";
 import type {
   EditorImage,
@@ -138,6 +139,7 @@ export function ProductEditor({
   const [tags, setTags] = useState((product?.tags ?? []).join(", "));
   const [seoTitle, setSeoTitle] = useState(product?.seo_title ?? "");
   const [seoDescription, setSeoDescription] = useState(product?.seo_description ?? "");
+  const [care, setCare] = useState<Care>(product?.care ?? EMPTY_CARE);
   const [options, setOptions] = useState<OptionDraft[]>(
     (product?.options ?? []).map((option) => ({
       name: option.name,
@@ -245,6 +247,7 @@ export function ProductEditor({
       tags: tags.split(","),
       seo_title: seoTitle,
       seo_description: seoDescription,
+      care,
       options: optionList,
       variants: built,
       images: images.map((image) => ({ media_id: image.media_id, alt: image.alt })),
@@ -548,6 +551,49 @@ export function ProductEditor({
                 );
               })}
             </ul>
+          </AdminCard>
+
+          <AdminCard title={copy.sections.care}>
+            <p className="text-xs text-ink-muted">{copy.care.hint}</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {(["light", "water", "pet", "level"] as const).map((key) => (
+                <SelectInput
+                  key={key}
+                  id={`${uid}-care-${key}`}
+                  label={copy.care[key]}
+                  value={care[key]}
+                  onChange={(event) =>
+                    setCare((current) => ({ ...current, [key]: event.target.value }))
+                  }
+                >
+                  <option value="">{copy.care.none}</option>
+                  {Object.entries(copy.care.options[key]).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </SelectInput>
+              ))}
+            </div>
+            <TextInput
+              id={`${uid}-care-size`}
+              label={copy.care.size}
+              hint={copy.care.sizeHint}
+              value={care.size}
+              maxLength={80}
+              onChange={(event) => setCare((current) => ({ ...current, size: event.target.value }))}
+            />
+            <TextArea
+              id={`${uid}-care-notes`}
+              label={copy.care.notes}
+              hint={copy.care.notesHint}
+              value={care.notes}
+              maxLength={1200}
+              rows={4}
+              onChange={(event) =>
+                setCare((current) => ({ ...current, notes: event.target.value }))
+              }
+            />
           </AdminCard>
 
           <AdminCard title={copy.sections.seo}>

@@ -12,7 +12,16 @@ import {
   seoSchema,
   socialsSchema,
 } from "@/lib/admin/settings-schema";
-import { createSupabasePublicClient } from "@/lib/supabase/server";
+import { and, asc, eq } from "drizzle-orm";
+import { db, isDatabaseConfigured } from "@/lib/db";
+import {
+  navigationItems,
+  navigationMenus,
+  pageSections,
+  pages,
+  siteSettings,
+} from "@/lib/db/schema";
+import { publishedNow } from "@/lib/db/visibility";
 import { CMS_TAGS } from "./tags";
 import {
   HOME_SECTION_ORDER,
@@ -58,52 +67,75 @@ const FALLBACK_CHROME: SiteChrome = {
 const nonEmpty = (value: string | null | undefined, fallback: string): string =>
   value && value.trim() ? value : fallback;
 
-interface MenuItem {
-  label: string;
-  href: string;
-  position: number;
-}
-
 export async function getSiteChrome(): Promise<SiteChrome> {
   "use cache";
   cacheLife("days");
   cacheTag(CMS_TAGS.settings, CMS_TAGS.navigation);
 
-  const supabase = createSupabasePublicClient();
-  if (!supabase) return FALLBACK_CHROME;
+  if (!isDatabaseConfigured()) return FALLBACK_CHROME;
 
-  const [settingsResult, menusResult] = await Promise.all([
-    supabase
-      .from("site_settings")
-      .select("email, address, legal, phones, announcement, socials")
-      .maybeSingle(),
-    supabase
-      .from("navigation_menus")
-      .select("handle, title, navigation_items (label, href, position)"),
-  ]);
-  if (settingsResult.error || menusResult.error) {
+  let row:
+    | {
+        email: string;
+        address: string;
+        legal: string | null;
+        phones: unknown;
+        announcement: unknown;
+        socials: unknown;
+      }
+    | undefined;
+  let menuRows: {
+    handle: string;
+    title: string;
+    label: string | null;
+    href: string | null;
+    position: number | null;
+  }[];
+  try {
+    [[row], menuRows] = await Promise.all([
+      db()
+        .select({
+          email: siteSettings.email,
+          address: siteSettings.address,
+          legal: siteSettings.legal,
+          phones: siteSettings.phones,
+          announcement: siteSettings.announcement,
+          socials: siteSettings.socials,
+        })
+        .from(siteSettings)
+        .limit(1),
+      db()
+        .select({
+          handle: navigationMenus.handle,
+          title: navigationMenus.title,
+          label: navigationItems.label,
+          href: navigationItems.href,
+          position: navigationItems.position,
+        })
+        .from(navigationMenus)
+        .leftJoin(navigationItems, eq(navigationItems.menuId, navigationMenus.id))
+        .orderBy(asc(navigationItems.position)),
+    ]);
+  } catch (error) {
     console.warn(
       "[cms] chrome fell back to src/content",
-      settingsResult.error?.message ?? menusResult.error?.message,
+      error instanceof Error ? error.message : error,
     );
     return FALLBACK_CHROME;
   }
 
-  const row = settingsResult.data;
   const announcement = announcementSchema.safeParse(row?.announcement ?? {});
   const phones = phonesSchema.safeParse(row?.phones ?? {});
   const socials = socialsSchema.safeParse(row?.socials ?? []);
-  const menus = new Map(
-    (menusResult.data ?? []).map((menu) => [
-      menu.handle,
-      {
-        title: menu.title,
-        items: [...(menu.navigation_items as MenuItem[])]
-          .sort((a, b) => a.position - b.position)
-          .map(({ label, href }) => ({ label, href })),
-      },
-    ]),
-  );
+  const menus = new Map<string, { title: string; items: NavLink[] }>();
+  for (const item of menuRows) {
+    const menu = menus.get(item.handle) ?? { title: item.title, items: [] };
+    // Rows arrive ordered by position; a menu with no items has one row with null fields.
+    if (item.label !== null && item.href !== null) {
+      menu.items.push({ label: item.label, href: item.href });
+    }
+    menus.set(item.handle, menu);
+  }
   const menuLinks = (handle: string, fallback: NavLink[]): NavLink[] => {
     const items = menus.get(handle)?.items;
     return items && items.length ? items : fallback;
@@ -164,10 +196,17 @@ export async function getHomeSeo(): Promise<HomeSeo> {
   "use cache";
   cacheLife("days");
   cacheTag(CMS_TAGS.settings);
-  const supabase = createSupabasePublicClient();
-  if (!supabase) return seo.home;
-  const { data } = await supabase.from("site_settings").select("seo").maybeSingle();
-  const parsed = seoSchema.safeParse(data?.seo ?? {});
+  if (!isDatabaseConfigured()) return seo.home;
+  let stored: unknown;
+  try {
+    [{ seo: stored } = { seo: {} }] = await db()
+      .select({ seo: siteSettings.seo })
+      .from(siteSettings)
+      .limit(1);
+  } catch {
+    return seo.home;
+  }
+  const parsed = seoSchema.safeParse(stored ?? {});
   return parsed.success
     ? {
         title: nonEmpty(parsed.data.home.title, seo.home.title),
@@ -202,16 +241,27 @@ export async function getHomeSections(): Promise<HomeSections> {
   cacheLife("days");
   cacheTag(CMS_TAGS.home);
 
-  const supabase = createSupabasePublicClient();
-  if (!supabase) return allFallback();
-  const { data, error } = await supabase
-    .from("page_sections")
-    .select("type, data, position, pages!inner (handle)")
-    .eq("pages.handle", "home")
-    .order("position");
-  if (error) {
-    console.warn("[cms] homepage fell back to src/content", error.message);
+  if (!isDatabaseConfigured()) return allFallback();
+  try {
+    // Hidden sections and a hidden or scheduled page stay out of the public homepage.
+    const rows = await db()
+      .select({ type: pageSections.type, data: pageSections.data })
+      .from(pageSections)
+      .innerJoin(pages, eq(pages.id, pageSections.pageId))
+      .where(
+        and(
+          eq(pages.handle, "home"),
+          eq(pageSections.status, "published"),
+          publishedNow(pages.status, pages.publishedAt),
+        ),
+      )
+      .orderBy(asc(pageSections.position));
+    return buildHomeSections(rows);
+  } catch (error) {
+    console.warn(
+      "[cms] homepage fell back to src/content",
+      error instanceof Error ? error.message : error,
+    );
     return allFallback();
   }
-  return buildHomeSections(data);
 }

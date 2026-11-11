@@ -1,8 +1,8 @@
-// Generates supabase/seed.sql from the typed files in src/content, so the database starts
+// Generates db/seed.sql from the typed files in src/content, so the database starts
 // with exactly the copy the storefront renders today. Run: npm run seed:generate
 //
 // The output is idempotent (fixed ids derived from stable keys, "on conflict do nothing"),
-// so it can be applied to a fresh local stack or re-applied to the hosted project safely.
+// so it can be applied to a fresh local database or re-applied to Neon safely (npm run db:seed).
 // Staff invites are deliberately not part of the seed: emails are added out of band.
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -20,7 +20,7 @@ import { site } from "../src/content/site.ts";
 import { howItWorks, steps } from "../src/content/steps.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outFile = resolve(root, "supabase/seed.sql");
+const outFile = resolve(root, "db/seed.sql");
 
 /** Deterministic uuid from a stable key, so re-running the seed never duplicates rows. */
 const id = (key: string): string => {

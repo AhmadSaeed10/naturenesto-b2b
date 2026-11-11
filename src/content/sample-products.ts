@@ -1,3 +1,4 @@
+import { sampleCare } from "./sample-care";
 import type { CatalogSlug, Product, ProductBadge } from "./types";
 
 // Sample catalogue shown when no live product source is configured, or when it returns
@@ -312,9 +313,22 @@ const ROWS: Row[] = [
   },
 ];
 
+function careFacts(id: string): Product["care"] {
+  const facts = sampleCare[id];
+  if (!facts) return undefined;
+  return {
+    light: facts.light || undefined,
+    pet: facts.pet || undefined,
+    level: facts.level || undefined,
+  };
+}
+
 export const sampleProducts: Product[] = ROWS.map(({ image, inStock = true, ...row }) => ({
   ...row,
   inStock,
+  // Sample products open a read-only page too, so the shop never leads nowhere.
+  href: `/products/${row.id}`,
+  care: careFacts(row.id),
   // Decorative: the product name is printed right under the image.
   image: { src: `/images/products/${image}.webp`, alt: "", flag: "Placeholder image." },
 }));

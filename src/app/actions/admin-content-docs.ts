@@ -8,8 +8,9 @@ import { RICH_TEXT_MAX, toRichText } from "@/lib/cms/rich-text";
 import { CMS_TAGS } from "@/lib/cms/tags";
 import { HANDLE_PATTERN, toTag } from "@/lib/handle";
 import { rupeesToPaisa } from "@/lib/money";
-import type { Json } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { and, eq, ne } from "drizzle-orm";
+import { withActor } from "@/lib/db";
+import { blogPosts, faqItems, pages, workshops } from "@/lib/db/schema";
 
 export type DocResult =
   | { ok: true; id: string }
@@ -29,14 +30,27 @@ const seo = { seoTitle: z.string().trim().max(70), seoDescription: z.string().tr
 const fields = (error: z.ZodError) => [
   ...new Set(error.issues.map((issue) => String(issue.path[0]))),
 ];
-const toTimestamp = (value: string): string | null =>
-  value ? new Date(value).toISOString() : null;
+const toTimestamp = (value: string): Date | null => (value ? new Date(value) : null);
 
-function dbError(error: { code?: string; message: string }): DocResult {
-  if (error.code === "23505") return { ok: false, error: "handleTaken" };
-  if (error.code === "42501") return { ok: false, error: "forbidden" };
-  console.error("[content] save failed", error.message);
+function dbError(error: unknown): DocResult {
+  const { code, message } = error as { code?: string; message?: string };
+  if (code === "23505") return { ok: false, error: "handleTaken" };
+  if (code === "42501") return { ok: false, error: "forbidden" };
+  console.error("[content] save failed", message);
   return { ok: false, error: "failed" };
+}
+
+/** Runs one write as the staff member. A write that touches no row (wrong id) is a failure. */
+async function write(
+  actorId: string,
+  run: (tx: Parameters<Parameters<typeof withActor>[1]>[0]) => Promise<{ id: string }[]>,
+): Promise<DocResult> {
+  try {
+    const [saved] = await withActor(actorId, run);
+    return saved ? { ok: true, id: saved.id } : { ok: false, error: "failed" };
+  } catch (error) {
+    return dbError(error);
+  }
 }
 
 // Pages -----------------------------------------------------------------------------------
@@ -52,7 +66,8 @@ const pageSchema = z.object({
 export type PageInput = z.input<typeof pageSchema>;
 
 export async function savePage(input: PageInput): Promise<DocResult> {
-  if (!(await staffWithRole(ACCESS.content))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.content);
+  if (!actor) return { ok: false, error: "forbidden" };
   const parsed = pageSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid", fields: fields(parsed.error) };
   const value = parsed.data;
@@ -62,26 +77,25 @@ export async function savePage(input: PageInput): Promise<DocResult> {
   const row = {
     title: value.title,
     handle: value.handle,
-    body: toRichText(value.body) as unknown as Json,
+    body: toRichText(value.body) as unknown as Record<string, unknown>,
     status: value.published ? ("published" as const) : ("draft" as const),
-    published_at: value.published ? new Date().toISOString() : null,
-    seo_title: value.seoTitle || null,
-    seo_description: value.seoDescription || null,
+    publishedAt: value.published ? new Date() : null,
+    seoTitle: value.seoTitle || null,
+    seoDescription: value.seoDescription || null,
   };
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = value.id
-    ? await supabase
-        .from("pages")
-        .update(row)
-        .eq("id", value.id)
-        .neq("handle", "home")
-        .select("id")
-        .single()
-    : await supabase.from("pages").insert(row).select("id").single();
-  if (error) return dbError(error);
+  const result = await write(actor.id, (tx) =>
+    value.id
+      ? tx
+          .update(pages)
+          .set(row)
+          .where(and(eq(pages.id, value.id), ne(pages.handle, "home")))
+          .returning({ id: pages.id })
+      : tx.insert(pages).values(row).returning({ id: pages.id }),
+  );
+  if (!result.ok) return result;
   revalidateTag(CMS_TAGS.pages, "max");
   revalidatePath("/admin/content/pages");
-  return { ok: true, id: data.id };
+  return result;
 }
 
 // Blog posts -----------------------------------------------------------------------------
@@ -111,29 +125,33 @@ export async function savePost(input: PostInput): Promise<DocResult> {
     title: value.title,
     handle: value.handle,
     excerpt: value.excerpt || null,
-    cover_media_id: value.coverId || null,
+    coverMediaId: value.coverId || null,
     tags: [...new Set(value.tags.map(toTag).filter(Boolean))],
-    body: toRichText(value.body) as unknown as Json,
+    body: toRichText(value.body) as unknown as Record<string, unknown>,
     status: value.published ? ("published" as const) : ("draft" as const),
-    // A future date schedules the post: RLS hides it until then.
-    published_at: value.published
-      ? (toTimestamp(value.publishedAt) ?? new Date().toISOString())
+    // A future date schedules the post: the storefront hides it until then.
+    publishedAt: value.published
+      ? (toTimestamp(value.publishedAt) ?? new Date())
       : toTimestamp(value.publishedAt),
-    seo_title: value.seoTitle || null,
-    seo_description: value.seoDescription || null,
+    seoTitle: value.seoTitle || null,
+    seoDescription: value.seoDescription || null,
   };
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = value.id
-    ? await supabase.from("blog_posts").update(row).eq("id", value.id).select("id").single()
-    : await supabase
-        .from("blog_posts")
-        .insert({ ...row, author_id: staff.id })
-        .select("id")
-        .single();
-  if (error) return dbError(error);
+  const result = await write(staff.id, (tx) =>
+    value.id
+      ? tx
+          .update(blogPosts)
+          .set(row)
+          .where(eq(blogPosts.id, value.id))
+          .returning({ id: blogPosts.id })
+      : tx
+          .insert(blogPosts)
+          .values({ ...row, authorId: staff.id })
+          .returning({ id: blogPosts.id }),
+  );
+  if (!result.ok) return result;
   revalidateTag(CMS_TAGS.posts, "max");
   revalidatePath("/admin/content/blog");
-  return { ok: true, id: data.id };
+  return result;
 }
 
 // Workshops ------------------------------------------------------------------------------
@@ -160,7 +178,8 @@ const workshopSchema = z
 export type WorkshopInput = z.input<typeof workshopSchema>;
 
 export async function saveWorkshop(input: WorkshopInput): Promise<DocResult> {
-  if (!(await staffWithRole(ACCESS.content))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.content);
+  if (!actor) return { ok: false, error: "forbidden" };
   const parsed = workshopSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid", fields: fields(parsed.error) };
   const value = parsed.data;
@@ -169,24 +188,29 @@ export async function saveWorkshop(input: WorkshopInput): Promise<DocResult> {
     title: value.title,
     handle: value.handle,
     summary: value.summary || null,
-    cover_media_id: value.coverId || null,
-    body: toRichText(value.body) as unknown as Json,
-    starts_at: toTimestamp(value.startsAt),
-    ends_at: toTimestamp(value.endsAt),
+    coverMediaId: value.coverId || null,
+    body: toRichText(value.body) as unknown as Record<string, unknown>,
+    startsAt: toTimestamp(value.startsAt),
+    endsAt: toTimestamp(value.endsAt),
     location: value.location || null,
     capacity: value.capacity === "" ? null : value.capacity,
     price: value.price === "" ? null : rupeesToPaisa(value.price),
     status: value.published ? ("published" as const) : ("draft" as const),
-    published_at: value.published ? new Date().toISOString() : null,
+    publishedAt: value.published ? new Date() : null,
   };
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = value.id
-    ? await supabase.from("workshops").update(row).eq("id", value.id).select("id").single()
-    : await supabase.from("workshops").insert(row).select("id").single();
-  if (error) return dbError(error);
+  const result = await write(actor.id, (tx) =>
+    value.id
+      ? tx
+          .update(workshops)
+          .set(row)
+          .where(eq(workshops.id, value.id))
+          .returning({ id: workshops.id })
+      : tx.insert(workshops).values(row).returning({ id: workshops.id }),
+  );
+  if (!result.ok) return result;
   revalidateTag(CMS_TAGS.workshops, "max");
   revalidatePath("/admin/content/workshops");
-  return { ok: true, id: data.id };
+  return result;
 }
 
 // FAQ ------------------------------------------------------------------------------------
@@ -202,49 +226,55 @@ const faqSchema = z.object({
 export type FaqInput = z.input<typeof faqSchema>;
 
 export async function saveFaq(input: FaqInput): Promise<DocResult> {
-  if (!(await staffWithRole(ACCESS.content))) return { ok: false, error: "forbidden" };
+  const actor = await staffWithRole(ACCESS.content);
+  if (!actor) return { ok: false, error: "forbidden" };
   const parsed = faqSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid", fields: fields(parsed.error) };
   const value = parsed.data;
   const row = {
     question: value.question,
-    answer: toRichText(value.answer) as unknown as Json,
+    answer: toRichText(value.answer) as unknown as Record<string, unknown>,
     category: value.category || null,
     position: value.position,
     status: value.published ? ("published" as const) : ("draft" as const),
   };
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = value.id
-    ? await supabase.from("faq_items").update(row).eq("id", value.id).select("id").single()
-    : await supabase.from("faq_items").insert(row).select("id").single();
-  if (error) return dbError(error);
+  const result = await write(actor.id, (tx) =>
+    value.id
+      ? tx.update(faqItems).set(row).where(eq(faqItems.id, value.id)).returning({ id: faqItems.id })
+      : tx.insert(faqItems).values(row).returning({ id: faqItems.id }),
+  );
+  if (!result.ok) return result;
   revalidateTag(CMS_TAGS.faq, "max");
   revalidatePath("/admin/content/faq");
-  return { ok: true, id: data.id };
+  return result;
 }
 
 // Delete ---------------------------------------------------------------------------------
 
 const TABLES = {
-  pages: { table: "pages", tag: CMS_TAGS.pages },
-  blog: { table: "blog_posts", tag: CMS_TAGS.posts },
-  workshops: { table: "workshops", tag: CMS_TAGS.workshops },
-  faq: { table: "faq_items", tag: CMS_TAGS.faq },
+  pages: { table: pages, tag: CMS_TAGS.pages },
+  blog: { table: blogPosts, tag: CMS_TAGS.posts },
+  workshops: { table: workshops, tag: CMS_TAGS.workshops },
+  faq: { table: faqItems, tag: CMS_TAGS.faq },
 } as const;
 export type DocKind = keyof typeof TABLES;
 
 export async function deleteDoc(kind: DocKind, id: string): Promise<{ ok: boolean }> {
-  if (!(await staffWithRole(ACCESS.content))) return { ok: false };
+  const actor = await staffWithRole(ACCESS.content);
+  if (!actor) return { ok: false };
   const target = TABLES[kind];
   const parsed = z.uuid().safeParse(id);
   if (!target || !parsed.success) return { ok: false };
-  const supabase = await createSupabaseServerClient();
-  // The homepage record holds the section blocks and is never deleted from here.
-  const { error } =
-    kind === "pages"
-      ? await supabase.from("pages").delete().eq("id", parsed.data).neq("handle", "home")
-      : await supabase.from(target.table).delete().eq("id", parsed.data);
-  if (error) return { ok: false };
+  try {
+    await withActor(actor.id, (tx) =>
+      // The homepage record holds the section blocks and is never deleted from here.
+      kind === "pages"
+        ? tx.delete(pages).where(and(eq(pages.id, parsed.data), ne(pages.handle, "home")))
+        : tx.delete(target.table).where(eq(target.table.id, parsed.data)),
+    );
+  } catch {
+    return { ok: false };
+  }
   revalidateTag(target.tag, "max");
   revalidatePath(`/admin/content/${kind}`);
   return { ok: true };

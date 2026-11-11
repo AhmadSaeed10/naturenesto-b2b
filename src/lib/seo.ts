@@ -8,6 +8,8 @@ interface PageMetadataInput {
   path: string;
   /** Use the title as is, without the "| Nature Nesto" template. */
   absoluteTitle?: boolean;
+  /** Social share image; defaults to the site image. */
+  image?: { url: string; alt: string };
 }
 
 const ogImage = {
@@ -22,7 +24,9 @@ export function pageMetadata({
   description,
   path,
   absoluteTitle = false,
+  image,
 }: PageMetadataInput): Metadata {
+  const images = image ? [{ url: image.url, alt: image.alt }] : [ogImage];
   return {
     title: absoluteTitle ? { absolute: title } : title,
     description,
@@ -34,9 +38,9 @@ export function pageMetadata({
       siteName: site.name,
       locale: "en_PK",
       type: "website",
-      images: [ogImage],
+      images,
     },
-    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
+    twitter: { card: "summary_large_image", title, description, images },
   };
 }
 

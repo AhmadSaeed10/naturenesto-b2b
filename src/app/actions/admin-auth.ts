@@ -1,14 +1,14 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { APIError } from "better-auth/api";
 import { z } from "zod";
-import { ADMIN_LOGIN, AUTH_CALLBACK, safeAdminNext } from "@/lib/auth/paths";
-import { getStaff } from "@/lib/auth/staff";
+import { ensureStaffAccount } from "@/lib/auth/accounts";
+import { ADMIN_LOGIN, safeAdminNext } from "@/lib/auth/paths";
+import { getAuth, isAuthConfigured } from "@/lib/auth/server";
+import { loadStaff } from "@/lib/auth/staff";
 import { RATE_LIMITS, clientIp, withinRateLimit } from "@/lib/rate-limit";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { supabasePublicEnv } from "@/lib/supabase/env";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type LoginError = "email" | "credentials" | "rateLimited" | "notConfigured" | "notStaff";
 
@@ -27,66 +27,8 @@ const loginSchema = z.object({
   next: z.string().max(500).optional(),
 });
 
-async function siteOrigin(): Promise<string> {
-  const list = await headers();
-  const host = list.get("x-forwarded-host") ?? list.get("host");
-  const proto = list.get("x-forwarded-proto") ?? "https";
-  return host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
-}
-
-/**
- * Staff-only access: an email can sign in only if it has a pending invite or a profile with
- * a role. The account is created here with the service role on first sign in, so public
- * sign ups can stay disabled in Supabase Auth.
- */
-async function ensureStaffAccount(email: string): Promise<boolean> {
-  const supabase = createSupabaseAdminClient();
-  // Case-insensitive exact match: escape the LIKE wildcards that are legal in emails.
-  const pattern = email.replace(/[\\%_]/g, "\\$&");
-  const [{ data: invite }, { data: profile }] = await Promise.all([
-    supabase
-      .from("staff_invites")
-      .select("id, role, accepted_at")
-      .ilike("email", pattern)
-      .maybeSingle(),
-    supabase.from("profiles").select("id, role").ilike("email", pattern).maybeSingle(),
-  ]);
-  if (profile?.role) return true;
-  if (!invite) return false;
-  // An accepted invite whose account has no role means access was removed; it must not
-  // come back by signing in again.
-  if (profile && invite.accepted_at) return false;
-
-  if (profile) {
-    // An existing non-staff account (for example a customer) that was invited later: the
-    // invite trigger only runs when an account is created, so the role is applied here.
-    const { error } = await supabase
-      .from("profiles")
-      .update({ role: invite.role })
-      .eq("id", profile.id);
-    if (error) {
-      console.error("[admin-auth] could not apply invite", error.message);
-      return false;
-    }
-    await supabase
-      .from("staff_invites")
-      .update({ accepted_at: new Date().toISOString() })
-      .eq("id", invite.id);
-    return true;
-  }
-
-  const { error } = await supabase.auth.admin.createUser({ email, email_confirm: true });
-  if (error) {
-    console.error("[admin-auth] could not create staff user", error.message);
-    return false;
-  }
-  return true;
-}
-
 export async function signIn(_previous: LoginState, formData: FormData): Promise<LoginState> {
-  if (!supabasePublicEnv() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { status: "error", error: "notConfigured" };
-  }
+  if (!isAuthConfigured()) return { status: "error", error: "notConfigured" };
 
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
@@ -103,36 +45,58 @@ export async function signIn(_previous: LoginState, formData: FormData): Promise
   ]);
   if (!ipOk || !emailOk) return { status: "error", error: "rateLimited", email };
 
-  const supabase = await createSupabaseServerClient();
+  const auth = getAuth();
 
   if (password) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { status: "error", error: "credentials", email };
-    if (!(await getStaff())) {
-      await supabase.auth.signOut();
+    let signedIn;
+    try {
+      signedIn = await auth.api.signInEmail({
+        body: { email, password },
+        headers: await headers(),
+      });
+    } catch (error) {
+      if (!(error instanceof APIError)) throw error;
+      return { status: "error", error: "credentials", email };
+    }
+    // The session cookie set by signInEmail is not readable from this request yet, so the
+    // staff check goes by the user id the sign in returned.
+    if (!(await loadStaff(signedIn.user.id))) {
+      // A customer account must not keep a session from the admin form.
+      const context = await auth.$context;
+      await context.internalAdapter.deleteSession(signedIn.token).catch(() => undefined);
+      (await cookies()).delete(context.authCookies.sessionToken.name);
       return { status: "error", error: "notStaff", email };
     }
     redirect(safeAdminNext(next));
   }
 
-  // Same answer whether or not the email has access, so the form cannot be used to find
-  // out who the staff are.
+  // Same answer whether or not the email has access, so the form cannot be used to find out
+  // who the staff are.
   if (await ensureStaffAccount(email)) {
-    const callback = new URL(AUTH_CALLBACK, await siteOrigin());
-    callback.searchParams.set("next", safeAdminNext(next));
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false, emailRedirectTo: callback.toString() },
-    });
-    if (error) console.error("[admin-auth] magic link failed", error.message);
+    try {
+      await auth.api.signInMagicLink({
+        body: {
+          email,
+          callbackURL: safeAdminNext(next),
+          errorCallbackURL: `${ADMIN_LOGIN}?error=callback`,
+        },
+        headers: await headers(),
+      });
+    } catch (error) {
+      console.error(
+        "[admin-auth] magic link failed",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
   return { status: "link_sent", email };
 }
 
 export async function signOut(): Promise<void> {
-  if (supabasePublicEnv()) {
-    const supabase = await createSupabaseServerClient();
-    await supabase.auth.signOut();
+  if (isAuthConfigured()) {
+    await getAuth()
+      .api.signOut({ headers: await headers() })
+      .catch(() => undefined);
   }
   redirect(ADMIN_LOGIN);
 }

@@ -6,8 +6,8 @@ import { canAccess, requireStaff } from "@/lib/auth/staff";
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   const staff = await requireStaff();
   const allowed = [
-    ...(canAccess(staff.role, "storeSettings") ? (["store", "commerce"] as const) : []),
-    ...(canAccess(staff.role, "staff") ? (["staff"] as const) : []),
+    ...(canAccess(staff, "storeSettings") ? (["store", "commerce"] as const) : []),
+    ...(canAccess(staff, "staff") ? (["staff"] as const) : []),
     "account" as const,
   ];
   return (

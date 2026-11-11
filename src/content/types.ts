@@ -127,6 +127,20 @@ export interface Product {
   size?: string;
   badges?: ProductBadge[];
   inStock: boolean;
-  /** Product page, for live catalogue products; sample products have none. */
+  /** Product page. Sample products have one too, with enquiry instead of the cart. */
   href?: string;
+  /** Second image, shown on hover where the card supports it. */
+  hoverImage?: ImageAsset;
+  /** Live products can be added to the cart straight from the card when they have one variant. */
+  quickAddVariantId?: string;
+  /** Care facts for the card icons and the shop filters. */
+  care?: {
+    light?: "low" | "medium" | "bright";
+    pet?: "safe" | "toxic";
+    level?: "easy" | "moderate" | "expert";
+  };
+  /** Units left when stock is tracked and low (for the "only n left" hint). */
+  lowStock?: number;
+  /** True when variants have different prices, so the card says "From". */
+  fromPrice?: boolean;
 }

@@ -25,9 +25,23 @@ jobs:
       - run: npm run format:check
       - run: npm run build
 
-  # RLS and policy tests against a throwaway local database, never the hosted project.
+  # Migrations, seed and behaviour checks against a throwaway Postgres, never Neon.
   database:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,8 +50,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Check the seed matches src/content
-        run: npm run seed:generate && git diff --exit-code supabase/seed.sql
-      - name: Start Postgres with migrations and seed
-        run: npx supabase db start
-      - name: Run pgTAP tests
-        run: npx supabase test db
+        run: npm run seed:generate && git diff --exit-code db/seed.sql
+      - run: npm run db:migrate
+      - run: npm run db:seed
+      - run: npm run db:smoke

@@ -1,4 +1,4 @@
-import type { Json } from "@/lib/supabase/database.types";
+import type { Json } from "@/lib/db/enums";
 
 // Types and helpers used by both admin server code and client components.
 

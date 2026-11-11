@@ -3,8 +3,9 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { ACCESS, staffWithRole } from "@/lib/auth/staff";
-import { Constants } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { sql } from "drizzle-orm";
+import { withActor } from "@/lib/db";
+import { ENUMS } from "@/lib/db/enums";
 
 export interface AdjustState {
   status: "idle" | "done" | "delta" | "forbidden" | "failed";
@@ -20,9 +21,7 @@ const schema = z.object({
     .max(1_000_000)
     .refine((n) => n !== 0),
   // "initial" and "import" are set by the editor and CSV import, not by hand.
-  reason: z
-    .enum(Constants.public.Enums.stock_reason)
-    .refine((r) => r !== "initial" && r !== "import"),
+  reason: z.enum(ENUMS.stock_reason).refine((r) => r !== "initial" && r !== "import"),
   note: z.string().trim().max(300),
 });
 
@@ -30,7 +29,8 @@ export async function adjustStock(
   _previous: AdjustState,
   formData: FormData,
 ): Promise<AdjustState> {
-  if (!(await staffWithRole(ACCESS.catalog))) return { status: "forbidden" };
+  const actor = await staffWithRole(ACCESS.catalog);
+  if (!actor) return { status: "forbidden" };
   const parsed = schema.safeParse({
     variantId: formData.get("variantId"),
     delta: formData.get("delta"),
@@ -39,19 +39,21 @@ export async function adjustStock(
   });
   if (!parsed.success) return { status: "delta" };
 
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("adjust_stock", {
-    p_variant_id: parsed.data.variantId,
-    p_delta: parsed.data.delta,
-    p_reason: parsed.data.reason,
-    p_note: parsed.data.note,
-  });
-  if (error) {
-    console.error("[inventory] adjust failed", error.message);
-    return { status: error.code === "42501" ? "forbidden" : "failed" };
+  let stock: number;
+  try {
+    // adjust_stock logs the change with the actor and refuses a negative result.
+    stock = await withActor(actor.id, async (tx) => {
+      const result = await tx.execute<{ stock: number }>(
+        sql`select public.adjust_stock(${parsed.data.variantId}::uuid, ${parsed.data.delta}, ${parsed.data.reason}::public.stock_reason, ${parsed.data.note}) as stock`,
+      );
+      return Number(result.rows[0]?.stock);
+    });
+  } catch (error) {
+    console.error("[inventory] adjust failed", error instanceof Error ? error.message : error);
+    return { status: (error as { code?: string }).code === "42501" ? "forbidden" : "failed" };
   }
   // Stock decides "out of stock" on the storefront.
   revalidateTag("products", "max");
   revalidatePath("/admin/inventory");
-  return { status: "done", stock: data };
+  return { status: "done", stock };
 }

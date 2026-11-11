@@ -1,6 +1,8 @@
 import "server-only";
-import type { Enums } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { db } from "@/lib/db";
+import type { Enums } from "@/lib/db/enums";
+import { inventoryAdjustments, products, productVariants } from "@/lib/db/schema";
 import { cleanSearch } from "./media";
 
 export type StockFilter = "all" | "low" | "out";
@@ -25,8 +27,7 @@ export interface InventoryPage {
 
 /**
  * Tracked variants of live products. Low stock compares each variant with its own
- * threshold, which PostgREST cannot filter on, so filtering happens after the fetch;
- * the catalogue is small enough for that.
+ * threshold, so filtering happens after the fetch; the catalogue is small enough for that.
  */
 export async function listInventory({
   query,
@@ -37,37 +38,38 @@ export async function listInventory({
   filter: StockFilter;
   page: number;
 }): Promise<InventoryPage> {
-  const supabase = await createSupabaseServerClient();
-  const request = supabase
-    .from("product_variants")
-    .select(
-      "id, title, sku, stock, low_stock_threshold, products!inner (id, title, handle, deleted_at)",
-    )
-    .eq("track_inventory", true)
-    .is("products.deleted_at", null)
-    .order("stock")
+  const data = await db()
+    .select({
+      id: productVariants.id,
+      title: productVariants.title,
+      sku: productVariants.sku,
+      stock: productVariants.stock,
+      threshold: productVariants.lowStockThreshold,
+      productId: products.id,
+      productTitle: products.title,
+      productHandle: products.handle,
+    })
+    .from(productVariants)
+    .innerJoin(products, eq(products.id, productVariants.productId))
+    .where(and(eq(productVariants.trackInventory, true), isNull(products.deletedAt)))
+    .orderBy(productVariants.stock)
     .limit(2000);
-
-  const { data, error } = await request;
-  if (error) throw new Error(`Could not load inventory: ${error.message}`);
 
   // Search covers product title, handle, variant title and SKU in one pass.
   const term = cleanSearch(query).toLowerCase();
   const rows = data
     .map((row): InventoryRow & { search: string } => {
-      const level = row.stock <= 0 ? "out" : row.stock <= row.low_stock_threshold ? "low" : "ok";
+      const level = row.stock <= 0 ? "out" : row.stock <= row.threshold ? "low" : "ok";
       return {
         variantId: row.id,
-        productId: row.products.id,
-        productTitle: row.products.title,
+        productId: row.productId,
+        productTitle: row.productTitle,
         variantTitle: row.title,
         sku: row.sku,
         stock: row.stock,
-        threshold: row.low_stock_threshold,
+        threshold: row.threshold,
         level,
-        search: [row.products.title, row.products.handle, row.title, row.sku]
-          .join(" ")
-          .toLowerCase(),
+        search: [row.productTitle, row.productHandle, row.title, row.sku].join(" ").toLowerCase(),
       };
     })
     .filter(
@@ -92,30 +94,31 @@ export interface StockSummary {
 }
 
 export async function stockSummary(): Promise<StockSummary> {
-  const supabase = await createSupabaseServerClient();
-  const [active, drafts, variants] = await Promise.all([
-    supabase
-      .from("products")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "active")
-      .is("deleted_at", null),
-    supabase
-      .from("products")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "draft")
-      .is("deleted_at", null),
-    supabase
-      .from("product_variants")
-      .select("stock, low_stock_threshold, products!inner (status, deleted_at)")
-      .eq("track_inventory", true)
-      .eq("products.status", "active")
-      .is("products.deleted_at", null),
+  const [[active], [drafts], rows] = await Promise.all([
+    db()
+      .select({ n: count() })
+      .from(products)
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt))),
+    db()
+      .select({ n: count() })
+      .from(products)
+      .where(and(eq(products.status, "draft"), isNull(products.deletedAt))),
+    db()
+      .select({ stock: productVariants.stock, threshold: productVariants.lowStockThreshold })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(
+        and(
+          eq(productVariants.trackInventory, true),
+          eq(products.status, "active"),
+          isNull(products.deletedAt),
+        ),
+      ),
   ]);
-  const rows = variants.data ?? [];
   return {
-    active: active.count ?? 0,
-    drafts: drafts.count ?? 0,
-    low: rows.filter((row) => row.stock > 0 && row.stock <= row.low_stock_threshold).length,
+    active: active?.n ?? 0,
+    drafts: drafts?.n ?? 0,
+    low: rows.filter((row) => row.stock > 0 && row.stock <= row.threshold).length,
     out: rows.filter((row) => row.stock <= 0).length,
   };
 }
@@ -131,23 +134,29 @@ export interface AdjustmentLine {
 }
 
 export async function recentAdjustments(limit = 20): Promise<AdjustmentLine[]> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("inventory_adjustments")
-    .select(
-      "id, delta, stock_after, reason, note, created_at, product_variants (title, products (title))",
-    )
-    .order("created_at", { ascending: false })
+  const rows = await db()
+    .select({
+      id: inventoryAdjustments.id,
+      delta: inventoryAdjustments.delta,
+      stockAfter: inventoryAdjustments.stockAfter,
+      reason: inventoryAdjustments.reason,
+      note: inventoryAdjustments.note,
+      createdAt: inventoryAdjustments.createdAt,
+      variantTitle: productVariants.title,
+      productTitle: products.title,
+    })
+    .from(inventoryAdjustments)
+    .leftJoin(productVariants, eq(productVariants.id, inventoryAdjustments.variantId))
+    .leftJoin(products, eq(products.id, productVariants.productId))
+    .orderBy(desc(inventoryAdjustments.createdAt))
     .limit(limit);
-  return (data ?? []).map((row) => ({
+  return rows.map((row) => ({
     id: row.id,
-    label: [row.product_variants?.products?.title, row.product_variants?.title]
-      .filter(Boolean)
-      .join(" · "),
+    label: [row.productTitle, row.variantTitle].filter(Boolean).join(" · "),
     delta: row.delta,
-    after: row.stock_after,
+    after: row.stockAfter,
     reason: row.reason,
     note: row.note,
-    at: row.created_at,
+    at: row.createdAt.toISOString(),
   }));
 }
