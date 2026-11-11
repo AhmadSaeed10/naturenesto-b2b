@@ -791,7 +791,9 @@ export const admin = {
         email: "Email",
         role: "Role",
         submit: "Send invite",
-        done: "Invited. Ask them to sign in at /admin/login.",
+        done: "Invite emailed. They sign in at /admin/login with that address.",
+        notSent:
+          "Invited, but the email could not be sent. Ask them to sign in at /admin/login with that address.",
       },
       change: "Change role",
       remove: "Remove access",

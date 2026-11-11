@@ -71,7 +71,9 @@ export function InviteForm({ roles }: RoleOptionsProps) {
         {copy.invite.submit}
       </Button>
       <p role="status" aria-live="polite" className="text-sm md:col-span-3">
-        {message(state, copy.invite.done)}
+        {state.status === "done" && state.emailed === false
+          ? copy.invite.notSent
+          : message(state, copy.invite.done)}
       </p>
     </form>
   );

@@ -3,12 +3,17 @@
 import { and, count, eq, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { admin } from "@/content/admin";
+import { ADMIN_LOGIN } from "@/lib/auth/paths";
 import { ACCESS, type StaffRole, staffWithRole } from "@/lib/auth/staff";
+import { sendEmail, staffInviteEmail } from "@/lib/email";
 import { withActor } from "@/lib/db";
 import { profiles, staffInvites, staffRole } from "@/lib/db/schema";
 
 export interface StaffActionState {
   status: "idle" | "done" | "invalid" | "exists" | "forbidden" | "last_owner" | "failed";
+  /** Invites only: false when the email could not be sent, so the admin shares the link by hand. */
+  emailed?: boolean;
 }
 
 const STAFF_PATH = "/admin/settings/staff";
@@ -51,9 +56,19 @@ export async function inviteStaff(
       if (existing) return { status: "exists" as const };
       await tx.insert(staffInvites).values(parsed.data);
       return { status: "done" as const };
-    }).then((state) => {
-      if (state.status === "done") revalidatePath(STAFF_PATH);
-      return state;
+    }).then(async (state): Promise<StaffActionState> => {
+      if (state.status !== "done") return state;
+      revalidatePath(STAFF_PATH);
+      const origin =
+        process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+      const mail = staffInviteEmail(
+        new URL(ADMIN_LOGIN, origin).toString(),
+        admin.roles[parsed.data.role],
+        actor.fullName || actor.email,
+      );
+      // The invite already exists; a failed email only means it must be shared by hand.
+      const emailed = await sendEmail({ to: parsed.data.email, ...mail });
+      return { status: "done", emailed };
     });
   } catch (error) {
     return { status: (error as { code?: string }).code === "23505" ? "exists" : "failed" };

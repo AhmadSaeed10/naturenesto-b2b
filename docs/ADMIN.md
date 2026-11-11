@@ -114,3 +114,14 @@ Neon keeps a short history window on the free plan (check the console under Back
 - **Orders** (`/admin/orders`): filter by status, search by number, name, phone or email. Open an order to change its status (with a note), mark it paid or unpaid, add a shipment (courier, tracking number and link, which marks it shipped), and read the history. **Cancelling puts the items back in stock** and is logged in inventory as "returned". Delivered and cancelled orders are closed.
 - **Customers** (`/admin/customers`): everyone who has ordered, with order count and spend; open one for their orders.
 - **New order alerts:** every placed order emails the shop (`ORDER_NOTIFY_EMAIL`, comma separated; defaults to every owner account) and sends the buyer a confirmation. Without `RESEND_API_KEY` the emails print in the dev terminal.
+
+## Inviting staff and free email
+
+Settings, Staff, "Invite someone": enter an email and a role. The person gets an email with the sign in steps, then signs in at /admin/login with that address (a sign in link is emailed, no password needed).
+
+Free email setup that reaches any address, no domain needed (Brevo, 300 emails a day):
+1. Make a free Brevo account, then Senders and IP, add your own address (for example a Gmail) as a sender and confirm the verification email.
+2. Create an API key under SMTP and API.
+3. Set `BREVO_API_KEY` and `EMAIL_FROM="NatureNesto <that-address>"` in `.env.local` and in Vercel.
+
+The same setup sends sign in links and order emails. If no email key is set, the invite is still saved and the form says the email was not sent, so share /admin/login by hand.
