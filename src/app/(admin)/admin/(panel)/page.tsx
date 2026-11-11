@@ -11,7 +11,7 @@ const LINK = "text-sm text-primary-dark underline underline-offset-4";
 export default async function AdminHomePage() {
   const staff = await requireStaff();
   const copy = admin.dashboard;
-  const data = canAccess(staff.role, "orders") ? await dashboardData() : null;
+  const data = canAccess(staff, "orders") ? await dashboardData() : null;
 
   const stats = data
     ? [
@@ -53,7 +53,7 @@ export default async function AdminHomePage() {
             )}
           </AdminCard>
 
-          {canAccess(staff.role, "catalog") ? (
+          {canAccess(staff, "catalog") ? (
             <AdminCard title={copy.lowStock}>
               {data.lowStock.length === 0 ? (
                 <p className="text-sm text-ink-muted">{copy.allGood}</p>

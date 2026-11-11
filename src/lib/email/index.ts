@@ -99,14 +99,14 @@ export function signInEmail(url: string): Omit<EmailMessage, "to"> {
   return { subject, text, html };
 }
 
-/** Tells a newly invited team member where to sign in. No password is sent: they get a link at sign in. */
+/** Gives a new team member their one time link to set a name and password. */
 export function staffInviteEmail(
-  loginUrl: string,
-  roleLabel: string,
+  inviteLink: string,
+  accessLabel: string,
   invitedBy: string,
 ): Omit<EmailMessage, "to"> {
   const subject = "You are invited to the NatureNesto admin";
-  const text = `${invitedBy} invited you to the NatureNesto admin as ${roleLabel}.\n\n1. Open ${loginUrl}\n2. Enter this email address and ask for a sign in link\n3. Open the link we email you\n\nIf you were not expecting this, you can ignore this email.`;
-  const html = `<p>${escapeHtml(invitedBy)} invited you to the NatureNesto admin as <strong>${escapeHtml(roleLabel)}</strong>.</p><ol><li>Open <a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a></li><li>Enter this email address and ask for a sign in link</li><li>Open the link we email you</li></ol><p>If you were not expecting this, you can ignore this email.</p>`;
+  const text = `${invitedBy} invited you to the NatureNesto admin (${accessLabel}).\n\nOpen this link to set your name and password. It works once and expires in 24 hours:\n${inviteLink}\n\nAfter that, sign in any time at /admin with your email and password.\n\nIf you were not expecting this, you can ignore this email.`;
+  const html = `<p>${escapeHtml(invitedBy)} invited you to the NatureNesto admin (<strong>${escapeHtml(accessLabel)}</strong>).</p><p><a href="${escapeHtml(inviteLink)}">Set your name and password</a><br>The link works once and expires in 24 hours.</p><p>After that, sign in any time at /admin with your email and password.</p><p>If you were not expecting this, you can ignore this email.</p>`;
   return { subject, text, html };
 }

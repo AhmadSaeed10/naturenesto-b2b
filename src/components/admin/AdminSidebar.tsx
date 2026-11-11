@@ -99,7 +99,10 @@ export function AdminSidebar({
               if (!href || !allowed.includes(section.key)) {
                 return (
                   <li key={section.key}>
-                    <span className={cn(LINK, "text-ink-muted")} aria-disabled="true">
+                    <span
+                      className={cn(LINK, "cursor-not-allowed text-ink-muted opacity-60")}
+                      aria-disabled="true"
+                    >
                       {section.label}
                       {!href ? (
                         <span className="rounded-pill border border-line px-2 text-xs">

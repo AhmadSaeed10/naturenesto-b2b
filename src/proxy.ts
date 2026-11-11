@@ -9,7 +9,11 @@ import { ACCOUNT_HOME, ACCOUNT_LOGIN, ADMIN_HOME, ADMIN_LOGIN } from "@/lib/auth
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const isLogin = pathname === ADMIN_LOGIN || pathname === ACCOUNT_LOGIN;
+  // The invite page is opened by someone with no account yet; its one time token is the gate.
+  const isLogin =
+    pathname === ADMIN_LOGIN ||
+    pathname === ACCOUNT_LOGIN ||
+    pathname.startsWith(`${ADMIN_HOME}/invite/`);
   const isAdmin = pathname === ADMIN_HOME || pathname.startsWith(`${ADMIN_HOME}/`);
   const isAccount = pathname === ACCOUNT_HOME || pathname.startsWith(`${ACCOUNT_HOME}/`);
   if (isLogin || !(isAdmin || isAccount)) return NextResponse.next();

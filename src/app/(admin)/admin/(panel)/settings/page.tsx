@@ -17,7 +17,7 @@ const SOCIAL_LABELS: Record<(typeof SOCIAL_PLATFORMS)[number], string> = {
 
 export default async function StoreSettingsPage() {
   const staff = await requireStaff();
-  if (!canAccess(staff.role, "storeSettings")) redirect("/admin/settings/account");
+  if (!canAccess(staff, "storeSettings")) redirect("/admin/settings/account");
 
   const [row, mediaOptions] = await Promise.all([loadSettingsRow(), listMediaOptions()]);
   const values = settingsFormValues(row);

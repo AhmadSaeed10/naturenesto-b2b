@@ -50,6 +50,8 @@ export async function ensureStaffAccount(email: string): Promise<boolean> {
 
   if (profile?.role) return true;
   if (!invite) return false;
+  // Link invites are accepted on the invite page only, never by asking for a sign in email.
+  if (invite.tokenHash || invite.expiresAt) return false;
   // An accepted invite whose profile has no role means access was removed; it must not come
   // back by signing in again.
   if (profile && invite.acceptedAt) return false;

@@ -7,7 +7,7 @@ export default async function ContentLayout({ children }: { children: React.Reac
   const staff = await requireStaff(ACCESS.content);
   return (
     <AdminPage title={admin.content.title}>
-      <ContentTabs showRedirects={canAccess(staff.role, "redirects")} />
+      <ContentTabs showRedirects={canAccess(staff, "redirects")} />
       {children}
     </AdminPage>
   );

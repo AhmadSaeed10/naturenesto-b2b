@@ -9,16 +9,32 @@ import { profiles, staffInvites } from "@/lib/db/schema";
 
 const copy = admin.settings.staff;
 
+/** Whole hours until a link stops working; null when the invite has no link. */
+function hoursUntil(date: Date | null): number | null {
+  return date ? Math.max(0, Math.ceil((date.getTime() - Date.now()) / 3_600_000)) : null;
+}
+
 export default async function StaffSettingsPage() {
   const staff = await requireStaff(ACCESS.staff);
   const [members, invites] = await Promise.all([
     db()
-      .select({ id: profiles.id, email: profiles.email, role: profiles.role })
+      .select({
+        id: profiles.id,
+        email: profiles.email,
+        role: profiles.role,
+        permissions: profiles.permissions,
+      })
       .from(profiles)
       .where(isNotNull(profiles.role))
       .orderBy(asc(profiles.email)),
     db()
-      .select({ id: staffInvites.id, email: staffInvites.email, role: staffInvites.role })
+      .select({
+        id: staffInvites.id,
+        email: staffInvites.email,
+        role: staffInvites.role,
+        permissions: staffInvites.permissions,
+        expiresAt: staffInvites.expiresAt,
+      })
       .from(staffInvites)
       .where(isNull(staffInvites.acceptedAt))
       .orderBy(asc(staffInvites.email)),
@@ -47,6 +63,7 @@ export default async function StaffSettingsPage() {
                     isSelf={member.id === staff.id}
                     editable={mayEdit(member.role)}
                     roles={assignable}
+                    areas={member.permissions}
                   />,
                 ]
               : [],
@@ -57,6 +74,8 @@ export default async function StaffSettingsPage() {
               id={invite.id}
               email={invite.email}
               role={invite.role}
+              areas={invite.permissions}
+              hoursLeft={hoursUntil(invite.expiresAt)}
               editable={mayEdit(invite.role)}
             />
           ))}

@@ -12,12 +12,12 @@ interface AdminShellProps {
 
 function allowedSections(staff: StaffMember): string[] {
   const keys = ["home", "settings"];
-  if (canAccess(staff.role, "media")) keys.push("media");
-  if (canAccess(staff.role, "catalog")) keys.push("products", "collections", "inventory");
-  if (canAccess(staff.role, "content")) keys.push("content");
-  if (canAccess(staff.role, "orders")) keys.push("orders");
-  if (canAccess(staff.role, "customers")) keys.push("customers");
-  if (canAccess(staff.role, "reviews")) keys.push("reviews");
+  if (canAccess(staff, "media")) keys.push("media");
+  if (canAccess(staff, "catalog")) keys.push("products", "collections", "inventory");
+  if (canAccess(staff, "content")) keys.push("content");
+  if (canAccess(staff, "orders")) keys.push("orders");
+  if (canAccess(staff, "customers")) keys.push("customers");
+  if (canAccess(staff, "reviews")) keys.push("reviews");
   return keys;
 }
 
@@ -35,7 +35,7 @@ export function AdminShell({ staff, children }: AdminShellProps) {
       <AdminSidebar
         allowed={allowedSections(staff)}
         roleLabel={admin.roles[staff.role]}
-        showSearch={canAccess(staff.role, "catalog")}
+        showSearch={canAccess(staff, "catalog")}
         email={staff.email}
         signOut={signOut}
       />

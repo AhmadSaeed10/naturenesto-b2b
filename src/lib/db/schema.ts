@@ -68,7 +68,7 @@ export const quoteStatus = pgEnum("quote_status", [
   "declined",
   "expired",
 ]);
-export const staffRole = pgEnum("staff_role", ["owner", "admin", "editor", "support"]);
+export const staffRole = pgEnum("staff_role", ["owner", "admin", "editor", "support", "member"]);
 export const stockReason = pgEnum("stock_reason", [
   "initial",
   "received",
@@ -96,6 +96,10 @@ export const profiles = pgTable(
     email: text().notNull(),
     fullName: text("full_name"),
     role: staffRole(),
+    permissions: text()
+      .array()
+      .default(sql`'{}'::text[]`)
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
   },
@@ -117,6 +121,12 @@ export const staffInvites = pgTable(
     id: uuid().defaultRandom().primaryKey().notNull(),
     email: text().notNull(),
     role: staffRole().notNull(),
+    permissions: text()
+      .array()
+      .default(sql`'{}'::text[]`)
+      .notNull(),
+    tokenHash: text("token_hash"),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
     acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),

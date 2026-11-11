@@ -117,11 +117,15 @@ Neon keeps a short history window on the free plan (check the console under Back
 
 ## Inviting staff and free email
 
-Settings, Staff, "Invite someone": enter an email and a role. The person gets an email with the sign in steps, then signs in at /admin/login with that address (a sign in link is emailed, no password needed).
+Settings, Staff, "Invite someone": enter an email, then either tick the areas they may use (products, page content, images and media, orders, customers, reviews) or pick a preset role. The invite makes a one time link that works for 24 hours. It is emailed and also shown on screen with a Copy button.
+
+The person opens the link, chooses their name and a password, and is signed in. After that they sign in any time at /admin with email and password. Sections they cannot use stay visible in the menu, greyed out, and their pages and actions are blocked on the server. An unused or expired invite shows "New link" in the staff list. The link works once; it cannot be used again after the person has joined.
+
+Custom access is only set when inviting. To change it later, remove access and invite again. Store settings, redirects and staff management stay with owners and admins.
 
 Free email setup that reaches any address, no domain needed (Brevo, 300 emails a day):
 1. Make a free Brevo account, then Senders and IP, add your own address (for example a Gmail) as a sender and confirm the verification email.
 2. Create an API key under SMTP and API.
 3. Set `BREVO_API_KEY` and `EMAIL_FROM="NatureNesto <that-address>"` in `.env.local` and in Vercel.
 
-The same setup sends sign in links and order emails. If no email key is set, the invite is still saved and the form says the email was not sent, so share /admin/login by hand.
+The same setup sends sign in links and order emails. If no email key is set, the invite is still saved and the page says the email was not sent; copy the link from the screen and send it yourself.
