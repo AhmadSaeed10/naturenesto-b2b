@@ -189,7 +189,7 @@ export function ShopGrid({ products, whatsappHref }: ShopGridProps) {
         <Stagger
           as="ul"
           key={`${light}-${petSafe}-${easy}-${inStock}-${sort}`}
-          className="grid grid-cols-2 gap-x-4 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 lg:gap-x-6"
+          className="grid grid-cols-2 gap-x-4 gap-y-14 pb-12 sm:grid-cols-3 lg:grid-cols-4 lg:gap-x-6 [&>li:nth-child(even)]:translate-y-8 sm:[&>li:nth-child(even)]:translate-y-0 lg:[&>li:nth-child(even)]:translate-y-12"
         >
           {shown.flatMap((product, index) => [
             ...(index === TILE_AT && shown.length > TILE_AT + 1

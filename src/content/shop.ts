@@ -16,6 +16,13 @@ export const shop = {
     from: "From",
     onlyLeft: (n: number) => `Only ${n} left`,
     soldOut: "Sold out",
+    sale: "Sale",
+    // Short care words for the printed line under the name.
+    careShort: {
+      light: { low: "Low light", medium: "Medium light", bright: "Bright light" },
+      pet: { safe: "Pet safe", toxic: "Pet toxic" },
+      level: { easy: "Easy", moderate: "Moderate", expert: "Expert" },
+    },
     quickAdd: "Quick add",
     chooseOptions: "Choose options",
     careIcons: "Care at a glance",
