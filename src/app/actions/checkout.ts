@@ -1,10 +1,13 @@
 "use server";
 
+import { after } from "next/server";
 import { redirect } from "next/navigation";
+import { sendOrderEmails } from "@/lib/email/order";
 import { z } from "zod";
 import {
   type Quote,
   clearCartCookie,
+  restorePreviousCart,
   commerceEnabled,
   quoteCart,
   readCartToken,
@@ -138,5 +141,8 @@ export async function placeOrder(
   const placed = z.object({ number: z.coerce.number(), access_token: z.uuid() }).safeParse(data);
   if (!placed.success) return { status: "error", error: "failed", values };
   await clearCartCookie();
+  // After a buy now order the shopper's usual cart comes back.
+  await restorePreviousCart();
+  after(() => sendOrderEmails(placed.data.number, placed.data.access_token));
   redirect(`/orders/${placed.data.number}?t=${placed.data.access_token}`);
 }

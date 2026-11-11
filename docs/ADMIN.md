@@ -9,7 +9,7 @@ The database (Neon Postgres, see docs/NEON.md) is the source of truth for produc
 | Owner | Everything, including staff and roles. Only an owner can create or change another owner |
 | Admin | Everything except touching owners |
 | Editor | Catalogue, collections, media and content (pages, blog, workshops, FAQ, navigation). No leads, settings or staff |
-| Support | Leads and quotes now; orders and customers from Stage F. Read only on the catalogue |
+| Support | Orders and customers, plus leads and quotes. Read only on the catalogue |
 
 Roles are enforced three times: `proxy.ts` (signed in), the admin layout (`requireStaff()`), and row level security on every table (the final guard). Every insert, update and delete on admin tables is written to `audit_log` by a trigger, with the actor and before and after values.
 
@@ -39,7 +39,7 @@ There is no public sign up. Owners and admins invite people in **Settings > Staf
 
 ## Checkout (Stage E)
 
-- **Storefront flow:** product page (`/products/<handle>`), cart (`/cart`), checkout (`/checkout`), confirmation (`/orders/<number>`). Category tiles link to product pages once real products are active; sample products keep the WhatsApp enquiry.
+- **Storefront flow:** product page (`/products/<handle>`) with Add to cart (opens the cart drawer) and Buy now (checks out that item alone; the usual cart is kept and comes back after the order), cart (`/cart`), checkout (`/checkout`), confirmation (`/orders/<number>`). Category tiles link to product pages once real products are active; sample products keep the WhatsApp enquiry.
 - **Guests** check out with email and phone. The confirmation link carries a private token, so only the buyer can open it. **Customers** can sign in at `/account/login` with an emailed link (no password) to see all orders with that email and save addresses. Guest orders join the account automatically when the same email signs in.
 - **Pricing** happens in the database (`cart_totals`), so the checkout preview and the placed order always agree. `place_order` runs in one transaction: it locks the variants, refuses oversells, applies the discount, decrements stock (logged in Inventory as "sold") and records the pending payment.
 - **Placeholders to confirm with the client:** delivery Lahore Rs 250, rest of Punjab Rs 400, rest of Pakistan Rs 600, free over Rs 15,000. GST 0 percent and included in prices. Cash on delivery on; bank transfer off. Edit them in Settings > Shipping & payments.
@@ -108,3 +108,9 @@ The sample products are drafts, so the storefront keeps showing the sample catal
 ## Restoring a backup
 
 Neon keeps a short history window on the free plan (check the console under Backup & Restore). Export the catalogue any time from Products > Export CSV.
+
+## Orders, customers and dashboard
+- **Dashboard** (`/admin`): orders and revenue for today and the last 7 days (cancelled orders excluded), orders to action, recent orders and low stock.
+- **Orders** (`/admin/orders`): filter by status, search by number, name, phone or email. Open an order to change its status (with a note), mark it paid or unpaid, add a shipment (courier, tracking number and link, which marks it shipped), and read the history. **Cancelling puts the items back in stock** and is logged in inventory as "returned". Delivered and cancelled orders are closed.
+- **Customers** (`/admin/customers`): everyone who has ordered, with order count and spend; open one for their orders.
+- **New order alerts:** every placed order emails the shop (`ORDER_NOTIFY_EMAIL`, comma separated; defaults to every owner account) and sends the buyer a confirmation. Without `RESEND_API_KEY` the emails print in the dev terminal.
