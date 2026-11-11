@@ -6,3 +6,6 @@ export const CART_OPEN_EVENT = "nn:cart-open";
 export const openCart = (): void => {
   window.dispatchEvent(new Event(CART_OPEN_EVENT));
 };
+
+/** Fired when a picked variant has its own photo, so the gallery can show it. */
+export const VARIANT_IMAGE_EVENT = "nn:variant-image";

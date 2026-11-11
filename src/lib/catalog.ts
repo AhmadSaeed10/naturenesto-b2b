@@ -8,6 +8,7 @@ import { mediaUrl } from "@/lib/media";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/lib/db";
 import { mediaAssets, productImages, products, productVariants } from "@/lib/db/schema";
+import { goneLive } from "@/lib/db/visibility";
 
 export type CatalogSource = "database" | "sample";
 
@@ -43,6 +44,7 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
       .where(
         and(
           eq(products.status, "active"),
+          goneLive(products.publishAt),
           isNull(products.deletedAt),
           sql`${products.tags} @> ARRAY[${slug}]::text[]`,
         ),

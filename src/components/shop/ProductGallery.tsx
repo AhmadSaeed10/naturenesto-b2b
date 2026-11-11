@@ -8,6 +8,7 @@ import { commerce } from "@/content/commerce";
 import { shop } from "@/content/shop";
 import type { ProductBadge } from "@/content/types";
 import { cn } from "@/lib/utils";
+import { VARIANT_IMAGE_EVENT } from "./cart-events";
 
 const copy = commerce.product.gallery;
 
@@ -52,6 +53,17 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
   }
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
+
+  // A variant with its own photo (picked in the buy box) brings that photo into view.
+  useEffect(() => {
+    const onVariantImage = (event: Event) => {
+      const src = (event as CustomEvent<string>).detail;
+      const index = images.findIndex((image) => image.src === src);
+      if (index >= 0) goTo(index);
+    };
+    window.addEventListener(VARIANT_IMAGE_EVENT, onVariantImage);
+    return () => window.removeEventListener(VARIANT_IMAGE_EVENT, onVariantImage);
+  }, [images, goTo]);
 
   // The native dialog gives focus trapping, Escape and a backdrop; page scroll is locked by hand.
   useEffect(() => {

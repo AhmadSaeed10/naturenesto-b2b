@@ -56,7 +56,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
   const base = siteUrl();
   const category = catalogCategories.find((entry) => entry.slug === product.categories[0]);
   const [related, pots, reviews] = await Promise.all([
-    getRelatedProducts(product.handle, product.categories),
+    getRelatedProducts(product.handle, product.categories, product.relatedHandles),
     getPairingPots(product.categories),
     getProductReviews(product.handle),
   ]);
@@ -81,7 +81,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
     const group = copy.care[key] as Record<string, string>;
     return group[value] ? [{ key, label: group[value] }] : [];
   });
-  const intro = richTextPlain(product.description, 220);
+  const intro = product.shortDescription || richTextPlain(product.description, 220);
   const url = `${base}/products/${product.handle}`;
 
   const jsonLd = [
@@ -111,6 +111,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
           : "https://schema.org/OutOfStock",
         url,
         sku: variant.sku ?? undefined,
+        ...(variant.barcode && /^\d{8,14}$/.test(variant.barcode) ? { gtin: variant.barcode } : {}),
       })),
     },
     {
@@ -132,12 +133,48 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
   ];
 
   const knowItems: AccordionItem[] = [
+    ...(product.specs.length > 0
+      ? [
+          {
+            id: "specs",
+            title: copy.specsTitle,
+            open: true,
+            content: (
+              <dl className="divide-y divide-line">
+                {product.specs.map((spec) => (
+                  <div
+                    key={spec.label}
+                    className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 py-2.5"
+                  >
+                    <dt className="text-ink-muted">{spec.label}</dt>
+                    <dd>{spec.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ),
+          },
+        ]
+      : []),
+    ...(product.included.length > 0
+      ? [
+          {
+            id: "included",
+            title: copy.includedTitle,
+            content: (
+              <ul className="flex list-disc flex-col gap-1.5 pl-5">
+                {product.included.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ),
+          },
+        ]
+      : []),
     ...(product.care.notes
       ? [
           {
             id: "care",
             title: copy.careNotes,
-            open: true,
             content: <p className="whitespace-pre-line">{product.care.notes}</p>,
           },
         ]
@@ -145,7 +182,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
     {
       id: "delivery",
       title: copy.deliveryTitle,
-      open: !product.care.notes,
+      open: false,
       content: (
         <div className="flex flex-col gap-3">
           <p>{copy.deliveryBody}</p>

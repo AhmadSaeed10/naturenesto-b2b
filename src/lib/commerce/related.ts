@@ -1,5 +1,6 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
+import { catalogCategories } from "@/content/catalog";
 import type { CatalogSlug, Product } from "@/content/types";
 import { getCatalog } from "@/lib/catalog";
 
@@ -16,13 +17,29 @@ const PAIRS: Partial<Record<CatalogSlug, CatalogSlug[]>> = {
 export async function getRelatedProducts(
   handle: string,
   categories: CatalogSlug[],
+  picked: string[] = [],
 ): Promise<Product[]> {
   "use cache";
   cacheLife("hours");
   cacheTag("products");
-  const slugs = [...new Set([...categories, ...categories.flatMap((slug) => PAIRS[slug] ?? [])])];
   const seen = new Set<string>([handle]);
   const related: Product[] = [];
+  // Products chosen by hand come first, in the order they were picked.
+  if (picked.length > 0) {
+    const byId = new Map<string, Product>();
+    for (const { slug } of catalogCategories) {
+      for (const product of (await getCatalog(slug)).products) byId.set(product.id, product);
+    }
+    for (const id of picked) {
+      const product = byId.get(id);
+      if (product?.href && !seen.has(id)) {
+        seen.add(id);
+        related.push(product);
+      }
+    }
+    if (related.length >= LIMIT) return related.slice(0, LIMIT);
+  }
+  const slugs = [...new Set([...categories, ...categories.flatMap((slug) => PAIRS[slug] ?? [])])];
   for (const slug of slugs) {
     const { products } = await getCatalog(slug);
     for (const product of products) {

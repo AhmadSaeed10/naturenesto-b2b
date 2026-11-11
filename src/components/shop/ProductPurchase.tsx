@@ -13,7 +13,7 @@ import type { PairingPot } from "@/lib/commerce/related";
 import Image from "next/image";
 import { formatPaisa } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { CART_EVENT, openCart } from "./cart-events";
+import { CART_EVENT, VARIANT_IMAGE_EVENT, openCart } from "./cart-events";
 
 const copy = commerce.product;
 const MAX_QUANTITY = 99;
@@ -58,6 +58,19 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
           ),
     [product, selected],
   );
+
+  // Tell the gallery to show the photo of the picked variant. Skipped on first render so the
+  // page opens on the main photo.
+  const firstRender = useRef(true);
+  const variantImage = variant?.imageSrc ?? null;
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (variantImage)
+      window.dispatchEvent(new CustomEvent(VARIANT_IMAGE_EVENT, { detail: variantImage }));
+  }, [variantImage]);
 
   const maxQuantity = variant?.lowStock ?? MAX_QUANTITY;
   const canBuy = Boolean(variant?.available) && !readOnly;

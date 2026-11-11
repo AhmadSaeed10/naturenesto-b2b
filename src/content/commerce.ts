@@ -96,6 +96,8 @@ export const commerce = {
     deliveryLink: "Read about shipping",
     related: "Goes well with",
     // flag: review, add-on and shipping line wording is new, confirm with the client.
+    specsTitle: "Specifications",
+    includedTitle: "What is included",
     recommend: { title: "Our plant experts recommend", add: "Add", added: "Added" },
     shipLine: "Cash on delivery available. Delivery cost is shown at checkout.",
     reviews: {

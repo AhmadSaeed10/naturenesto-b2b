@@ -11,6 +11,7 @@ import { mediaUrl } from "@/lib/media";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/lib/db";
 import type { Json } from "@/lib/db/enums";
+import { goneLive } from "@/lib/db/visibility";
 import {
   mediaAssets,
   productImages,
@@ -30,6 +31,9 @@ export interface StoreVariant {
   available: boolean;
   /** Units left when stock is tracked and low, for the "only n left" hint. */
   lowStock: number | null;
+  barcode: string | null;
+  /** Photo to show when this variant is picked; one of the product images. */
+  imageSrc: string | null;
 }
 
 export interface StoreProduct {
@@ -39,6 +43,11 @@ export interface StoreProduct {
   handle: string;
   title: string;
   description: string;
+  shortDescription: string;
+  specs: { label: string; value: string }[];
+  included: string[];
+  /** Handles picked by hand in the admin, shown first under "Goes well with". */
+  relatedHandles: string[];
   productType: string | null;
   vendor: string | null;
   tags: string[];
@@ -67,6 +76,19 @@ const asRecord = (value: Json): Record<string, string> =>
       )
     : {};
 
+const asSpecs = (value: Json): { label: string; value: string }[] =>
+  Array.isArray(value)
+    ? value.flatMap((row) =>
+        row &&
+        typeof row === "object" &&
+        !Array.isArray(row) &&
+        typeof row.label === "string" &&
+        typeof row.value === "string"
+          ? [{ label: row.label, value: row.value }]
+          : [],
+      )
+    : [];
+
 /**
  * An active product for its page. Drafts and deleted products are never returned. A handle
  * with no live product falls back to the sample catalogue, the same fallback the category
@@ -88,6 +110,10 @@ function sampleStoreProduct(handle: string): StoreProduct | null {
     handle: sample.id,
     title: sample.name,
     description: "",
+    shortDescription: "",
+    specs: [],
+    included: [],
+    relatedHandles: [],
     productType: null,
     vendor: null,
     tags: [],
@@ -109,6 +135,8 @@ function sampleStoreProduct(handle: string): StoreProduct | null {
         optionValues: {},
         available: sample.inStock,
         lowStock: null,
+        barcode: null,
+        imageSrc: null,
       },
     ],
     images: [{ src: sample.image.src, alt: sample.name }],
@@ -121,7 +149,12 @@ async function getLiveProduct(handle: string): Promise<StoreProduct | null> {
     .select()
     .from(products)
     .where(
-      and(eq(products.handle, handle), eq(products.status, "active"), isNull(products.deletedAt)),
+      and(
+        eq(products.handle, handle),
+        eq(products.status, "active"),
+        goneLive(products.publishAt),
+        isNull(products.deletedAt),
+      ),
     )
     .limit(1);
   if (!data) return null;
@@ -139,6 +172,7 @@ async function getLiveProduct(handle: string): Promise<StoreProduct | null> {
       .orderBy(asc(productVariants.position)),
     db()
       .select({
+        mediaId: productImages.mediaId,
         alt: productImages.alt,
         externalUrl: mediaAssets.externalUrl,
         storagePath: mediaAssets.storagePath,
@@ -151,14 +185,20 @@ async function getLiveProduct(handle: string): Promise<StoreProduct | null> {
       .orderBy(asc(productImages.position)),
   ]);
 
+  const srcByMedia = new Map(imageRows.map((image) => [image.mediaId, mediaUrl(image)]));
+
   return {
     source: "database",
     id: data.id,
     handle: data.handle,
     title: data.title,
-    // Descriptions are plain text today; rich text is read the same way when it arrives.
+    // Stored as markdown (older rows as plain text); the page renders both the same way.
     description:
       richTextSource(data.description as Json) || descriptionText(data.description as Json),
+    shortDescription: data.shortDescription ?? "",
+    specs: asSpecs(data.specs as Json),
+    included: data.included,
+    relatedHandles: data.relatedHandles,
     productType: data.productType,
     vendor: data.vendor,
     tags: data.tags,
@@ -185,6 +225,8 @@ async function getLiveProduct(handle: string): Promise<StoreProduct | null> {
           v.trackInventory && !v.allowBackorder && v.stock > 0 && v.stock <= v.lowStockThreshold
             ? v.stock
             : null,
+        barcode: v.barcode,
+        imageSrc: v.imageMediaId ? (srcByMedia.get(v.imageMediaId) ?? null) : null,
       };
     }),
     images: imageRows.map((image) => ({
@@ -204,7 +246,9 @@ export async function listProductHandles(): Promise<string[]> {
   const rows = await db()
     .select({ handle: products.handle })
     .from(products)
-    .where(and(eq(products.status, "active"), isNull(products.deletedAt)))
+    .where(
+      and(eq(products.status, "active"), goneLive(products.publishAt), isNull(products.deletedAt)),
+    )
     .limit(500);
   return [...new Set([...rows.map((row) => row.handle), ...samples])];
 }
