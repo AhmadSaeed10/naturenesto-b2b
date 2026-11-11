@@ -22,7 +22,7 @@ export default function ServicesPage() {
       <section className="mx-auto max-w-7xl px-4 pt-16 pb-12 md:px-8 md:pt-24">
         <Eyebrow className="mb-5">{site.name}</Eyebrow>
         <div className="flex flex-wrap items-end justify-between gap-8">
-          <SplitHeading as="h1" text={TITLE} className="text-display" />
+          <SplitHeading as="h1" text={TITLE} className="text-h1" />
           <Button href={`#${QUOTE_ID}`} variant="secondary" withArrow>
             {quote.eyebrow}
           </Button>

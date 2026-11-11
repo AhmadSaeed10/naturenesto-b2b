@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { SplitHeading } from "@/components/motion/SplitHeading";
 import { QUOTE_ID, QuoteSection } from "@/components/forms/QuoteSection";
+import { Reveal } from "@/components/motion/Reveal";
+import { SplitHeading } from "@/components/motion/SplitHeading";
 import { ServicesGrid } from "@/components/sections/ServicesGrid";
 import { BrandIcon } from "@/components/ui/BrandIcon";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Eyebrow } from "@/components/ui/Eyebrow";
-import { stubPages } from "@/content/pages";
+import { serviceCopy, serviceDetail } from "@/content/pages-copy";
 import { quote } from "@/content/quote";
 import { seo } from "@/content/seo";
 import { services } from "@/content/services";
@@ -28,7 +28,7 @@ export async function generateMetadata({
   return service
     ? pageMetadata({
         title: service.title,
-        description: seo.pageDescription(service.title),
+        description: serviceCopy[service.slug]?.intro ?? seo.pageDescription(service.title),
         path: service.href,
       })
     : {};
@@ -37,24 +37,39 @@ export async function generateMetadata({
 export default async function ServicePage({ params }: PageProps<"/services/[slug]">) {
   const service = find((await params).slug);
   if (!service) notFound();
-  // Service descriptions have not been supplied yet; the stub TODO stays visible.
-  const todo = stubPages.find((page) => page.path === service.href)?.todo;
+  const copy = serviceCopy[service.slug];
 
   return (
     <>
-      <section className="mx-auto grid max-w-7xl gap-10 px-4 pt-16 pb-16 md:px-8 md:pt-24 lg:grid-cols-[7fr_5fr] lg:items-end">
-        <div>
-          <Eyebrow className="mb-5">{SERVICES_TITLE}</Eyebrow>
-          <SplitHeading as="h1" text={service.title} className="mb-8 text-h1" />
-          <Button href={`#${QUOTE_ID}`} withArrow>
-            {quote.eyebrow}
-          </Button>
-        </div>
-        <Card grain className="flex items-start gap-5 border border-dashed border-ink/30">
-          <BrandIcon name={service.icon} size={44} className="shrink-0 text-primary-dark" />
-          <p className="text-ink">{todo}</p>
-        </Card>
+      <section className="mx-auto flex max-w-4xl flex-col items-start gap-6 px-4 pt-14 pb-12 md:px-8 md:pt-24 md:pb-16">
+        <BrandIcon name={service.icon} size={44} className="text-primary-dark" />
+        <Eyebrow>{SERVICES_TITLE}</Eyebrow>
+        <SplitHeading as="h1" text={service.title} className="text-h1" />
+        {copy ? <p className="max-w-2xl text-lead text-ink-muted">{copy.intro}</p> : null}
+        <Button href={`#${QUOTE_ID}`} withArrow>
+          {quote.eyebrow}
+        </Button>
       </section>
+      {copy ? (
+        <section className="bg-surface">
+          <Reveal className="mx-auto grid max-w-4xl gap-10 px-4 py-14 md:grid-cols-2 md:gap-16 md:px-8 md:py-20">
+            <div className="flex flex-col gap-4">
+              <h2 className="text-h3">{serviceDetail.includesTitle}</h2>
+              <ul className="flex flex-col divide-y divide-line border-y border-line">
+                {copy.includes.map((item) => (
+                  <li key={item} className="py-3 text-ink-muted">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex flex-col gap-4">
+              <h2 className="text-h3">{serviceDetail.forWhoTitle}</h2>
+              <p className="text-lead text-ink-muted">{copy.forWho}</p>
+            </div>
+          </Reveal>
+        </section>
+      ) : null}
       <QuoteSection defaultService={service.title} />
       <div className="pt-20 md:pt-28">
         <ServicesGrid />

@@ -29,20 +29,17 @@ export default async function FaqPage() {
   }
 
   return (
-    <section className="mx-auto flex max-w-7xl flex-col gap-12 px-4 py-20 md:px-8 lg:py-28">
+    <section className="mx-auto flex max-w-4xl flex-col gap-12 px-4 py-16 md:px-8 lg:py-24">
       <Reveal className="flex flex-col gap-6">
         <Eyebrow>{cms.faq.eyebrow}</Eyebrow>
         <h1 className="text-h1">{cms.faq.title}</h1>
       </Reveal>
       {[...groups.entries()].map(([group, questions]) => (
-        <section key={group} aria-label={group} className="flex max-w-3xl flex-col gap-3">
+        <section key={group} aria-label={group} className="flex flex-col gap-2">
           {groups.size > 1 ? <h2 className="font-serif text-h3">{group}</h2> : null}
           {questions.map((item) => (
             // Native disclosure: keyboard and screen reader support without script.
-            <details
-              key={item.id}
-              className="group rounded-card border border-line bg-background px-5 py-1 open:pb-5"
-            >
+            <details key={item.id} className="group border-b border-line py-1 open:pb-5">
               <summary className="flex min-h-(--size-tap) cursor-pointer list-none items-center justify-between gap-4 py-3 font-medium">
                 {item.question}
                 <span
