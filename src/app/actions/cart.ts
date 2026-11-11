@@ -172,7 +172,11 @@ export async function readCart(): Promise<DrawerCart> {
 }
 
 /** Checks out one item on its own cart; the shopper's usual cart waits in the background. */
-export async function buyNow(variantId: string, quantity: number): Promise<CartResult> {
+export async function buyNow(
+  variantId: string,
+  quantity: number,
+  extras: string[] = [],
+): Promise<CartResult> {
   const blocked = await guard();
   if (blocked) return blocked;
   const variant = variantSchema.safeParse(variantId);
@@ -185,6 +189,15 @@ export async function buyNow(variantId: string, quantity: number): Promise<CartR
     await db()
       .insert(cartItems)
       .values({ cartId, variantId: variant.data, quantity: Math.min(limit, qty.data) });
+    // Optional pairings (a pot with a plant), one each, only when they can be sold.
+    for (const extra of extras.slice(0, 3)) {
+      const id = variantSchema.safeParse(extra);
+      if (!id.success || id.data === variant.data || !(await sellable(id.data))) continue;
+      await db()
+        .insert(cartItems)
+        .values({ cartId, variantId: id.data, quantity: 1 })
+        .onConflictDoNothing();
+    }
     return { ok: true, count: await count(cartId) };
   } catch (error) {
     console.error("[cart] buy now failed", error instanceof Error ? error.message : error);

@@ -78,6 +78,35 @@ export const commerce = {
       cta: "Book a consultation",
     },
     // flag: specimen sheet labels below are new copy, confirm with the client.
+    // flag: pairing and chapter copy below is new, confirm with the client.
+    pairing: {
+      title: "Add a pot",
+      optional: "Optional",
+      none: "No pot, thanks",
+      added: (name: string) => `${name} added`,
+    },
+    chapters: {
+      light: {
+        title: "Light",
+        low: "Happy in a dim corner. A few metres from a window is enough.",
+        medium:
+          "Likes a bright room but not harsh sun. Near a window with a sheer curtain works well.",
+        bright:
+          "Wants plenty of light. Keep it by a bright window, with some direct sun if you can.",
+      },
+      water: {
+        title: "Water",
+        low: "Water only when the soil is fully dry. When in doubt, wait another day.",
+        moderate: "Water when the top of the soil feels dry, then let it drain well.",
+        frequent: "Keep the soil lightly moist and never let it dry out completely.",
+      },
+      place: {
+        title: "Placement",
+        safe: "Safe around pets, so it can live wherever you like.",
+        toxic: "Not safe for pets. Keep it out of reach of cats and dogs.",
+        none: "Pick a spot where you will see it every day, so you notice when it needs you.",
+      },
+    },
     plate: {
       label: (n: number) => `Plate No. ${n}`,
       fig: (title: string) => `Fig. 1. ${title}`,

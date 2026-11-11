@@ -9,6 +9,9 @@ import { Icon } from "@/components/ui/Icon";
 import { commerce } from "@/content/commerce";
 import { shop } from "@/content/shop";
 import type { StoreProduct } from "@/lib/commerce/products";
+import type { PairingPot } from "@/lib/commerce/related";
+import Image from "next/image";
+import { formatPrice } from "@/lib/format";
 import { formatPaisa } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { CART_EVENT, openCart } from "./cart-events";
@@ -19,17 +22,20 @@ const MAX_QUANTITY = 99;
 interface ProductPurchaseProps {
   product: Pick<StoreProduct, "title" | "options" | "variants" | "source">;
   whatsappHref: string;
+  /** Pots offered beside a plant; picking one adds it with the plant. */
+  pots?: PairingPot[];
 }
 
 const STEP_BUTTON =
   "inline-flex size-11 items-center justify-center text-ink transition-colors duration-(--duration-micro) ease-brand hover:bg-surface focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-dark disabled:text-ink-muted disabled:hover:bg-transparent";
 
-export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps) {
+export function ProductPurchase({ product, whatsappHref, pots = [] }: ProductPurchaseProps) {
   const uid = useId();
   const readOnly = product.source === "sample";
   const first = product.variants.find((v) => v.available) ?? product.variants[0];
   const [selected, setSelected] = useState<Record<string, string>>(first?.optionValues ?? {});
   const [quantity, setQuantity] = useState(1);
+  const [pot, setPot] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [added, setAdded] = useState(false);
   const router = useRouter();
@@ -70,7 +76,8 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
     setMessage("");
     setAdded(false);
     startTransition(async () => {
-      const result = await addToCart(variant.id, quantity);
+      let result = await addToCart(variant.id, quantity);
+      if (result.ok && pot) result = await addToCart(pot, 1);
       if (result.ok) {
         setAdded(true);
         setMessage(copy.added);
@@ -87,7 +94,7 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
     setMessage("");
     setAdded(false);
     startTransition(async () => {
-      const result = await buyNow(variant.id, quantity);
+      const result = await buyNow(variant.id, quantity, pot ? [pot] : []);
       if (result.ok) {
         router.push("/checkout");
       } else {
@@ -101,7 +108,13 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
   const enquiry = `${whatsappHref}?text=${encodeURIComponent(
     shop.whatsappMessage(label, variant ? formatPaisa(variant.price) : ""),
   )}`;
-  const buttonLabel = pending ? copy.adding : copy.addToCart;
+  const chosenPot = pots.find((entry) => entry.variantId === pot);
+  const total = variant ? variant.price * quantity + (chosenPot ? chosenPot.price * 100 : 0) : 0;
+  const buttonLabel = pending
+    ? copy.adding
+    : chosenPot
+      ? `${copy.addToCart} · ${formatPaisa(total)}`
+      : copy.addToCart;
 
   return (
     <div className="flex flex-col gap-6">
@@ -188,6 +201,54 @@ export function ProductPurchase({ product, whatsappHref }: ProductPurchaseProps)
         </div>
       ) : (
         <div className="flex flex-col gap-3">
+          {canBuy && pots.length > 0 ? (
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 flex w-full items-baseline justify-between text-small font-medium">
+                {copy.pairing.title}
+                <span className="font-normal text-ink-muted">{copy.pairing.optional}</span>
+              </legend>
+              <ul className="grid grid-cols-2 gap-2">
+                {pots.map((entry) => {
+                  const on = pot === entry.variantId;
+                  return (
+                    <li key={entry.variantId}>
+                      <button
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setPot(on ? null : entry.variantId)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-2xl border p-2 text-left transition-colors duration-(--duration-micro) ease-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark",
+                          on ? "border-ink bg-background" : "border-line hover:border-ink",
+                        )}
+                      >
+                        <span className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-surface">
+                          <Image
+                            src={entry.image}
+                            alt=""
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                          />
+                        </span>
+                        <span className="min-w-0 text-small">
+                          <span className="block truncate font-medium">{entry.name}</span>
+                          <span className="text-ink-muted">{formatPrice(entry.price)}</span>
+                        </span>
+                        {on ? (
+                          <Icon
+                            name="check"
+                            size={18}
+                            className="ml-auto shrink-0 text-primary-dark"
+                          />
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </fieldset>
+          ) : null}
+
           {canBuy ? (
             <>
               <div className="flex flex-wrap items-center gap-3">

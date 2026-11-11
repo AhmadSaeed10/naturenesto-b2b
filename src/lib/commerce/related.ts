@@ -34,3 +34,40 @@ export async function getRelatedProducts(
   }
   return related;
 }
+
+export interface PairingPot {
+  variantId: string;
+  name: string;
+  /** Rupees, like the catalogue cards. */
+  price: number;
+  image: string;
+  size: string | null;
+}
+
+/**
+ * Up to four in stock, single variant pots to offer beside a plant. Pots themselves get none,
+ * and samples never do (they cannot be bought).
+ */
+export async function getPairingPots(categories: CatalogSlug[]): Promise<PairingPot[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("products");
+  if (categories.includes("pots-and-planters")) return [];
+  const { products, source } = await getCatalog("pots-and-planters");
+  if (source !== "database") return [];
+  return products
+    .flatMap((product) =>
+      product.quickAddVariantId
+        ? [
+            {
+              variantId: product.quickAddVariantId,
+              name: product.name,
+              price: product.price,
+              image: product.image.src,
+              size: product.size ?? null,
+            },
+          ]
+        : [],
+    )
+    .slice(0, 4);
+}
