@@ -52,7 +52,7 @@ export function localBusinessJsonLd(baseUrl: string) {
     name: site.name,
     url: baseUrl,
     image: new URL(seo.ogImage.url, baseUrl).toString(),
-    logo: new URL("/brand/logo-full.png", baseUrl).toString(),
+    logo: new URL("/brand/logo-colored.png", baseUrl).toString(),
     email: site.email,
     telephone: site.phones.call.e164,
     description: seo.home.description,

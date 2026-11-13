@@ -75,7 +75,7 @@ export function MobileMenu({ links, cta, socials }: MobileMenuProps) {
       >
         <div className="grain mx-auto flex min-h-full max-w-7xl flex-col px-4 pb-8 md:px-8">
           <div className="flex h-18 items-center justify-between">
-            <Logo />
+            <Logo className="h-12" />
             <button
               type="button"
               onClick={hide}

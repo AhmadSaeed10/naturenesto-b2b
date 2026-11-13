@@ -38,7 +38,7 @@ export function Footer({
               aria-label={ui.homeLink}
               className="inline-flex min-h-(--size-tap) w-fit items-center"
             >
-              <Logo tone="light" showTagline />
+              <Logo tone="light" className="h-16 md:h-20" />
             </Link>
             <div>
               <h2 className="mb-3 eyebrow text-surface">{footerVisit.heading}</h2>

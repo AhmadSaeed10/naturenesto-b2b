@@ -17,8 +17,8 @@ export const site = {
   announcement: "Transform your space with exclusive discounts!",
   tagline: {
     home: "One Plant. One Piece. One Vibe at a time.",
-    logo: "Leaves . Delight . Nesto",
-    flag: "Confirm which tagline leads the brand.",
+    logo: "Nature . Design . Interiors",
+    flag: "Descriptor in the supplied logo files; replaces the earlier Leaves . Delight . Nesto line.",
   },
   legal: "2026 Nature Nesto, All Rights Reserved.",
   socials: [

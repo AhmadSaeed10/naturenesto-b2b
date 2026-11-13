@@ -14,7 +14,7 @@ Rebuild of https://naturenesto.com as a Next.js + TypeScript project. This is a 
 Lahore based plant and decor studio. Sells plants, pots and planters. Runs a consultative styling service: space planning, plant styling, custom posters and quotes, gift bundles, pot customization, corporate styling, ongoing plant care.
 Tone: warm, reassuring, judgement free, premium but approachable.
 Homepage tagline: "One Plant. One Piece. One Vibe at a time."
-Logo tagline: "Leaves . Delight . Nesto" (confirm with mentor which leads the brand).
+Logo descriptor: "Nature . Design . Interiors" (from the supplied logo SVGs in src/assets/brand; replaces "Leaves . Delight . Nesto").
 Address: 83/S Commercial Block, 1st Floor Rabeel, Imperial Garden, Paragon City, Barki Road, Lahore.
 Email: info@naturenesto.com
 
