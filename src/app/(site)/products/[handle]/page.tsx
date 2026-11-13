@@ -239,7 +239,13 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
           </nav>
 
           <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-start lg:gap-16">
-            <ProductGallery images={product.images} title={product.title} badges={product.badges} />
+            <div className="lg:sticky lg:top-28">
+              <ProductGallery
+                images={product.images}
+                title={product.title}
+                badges={product.badges}
+              />
+            </div>
 
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-4">

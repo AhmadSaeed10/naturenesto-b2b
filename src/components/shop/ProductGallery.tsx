@@ -33,6 +33,8 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
   const frame = useRef(0);
   const [active, setActive] = useState(0);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  // Lightbox zoom: click or tap toggles 2x around the pointer; arrows and close reset it.
+  const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null);
   const last = images.length - 1;
 
   const goTo = useCallback(
@@ -83,6 +85,7 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
 
   function onDialogKey(event: React.KeyboardEvent) {
     if (lightbox === null) return;
+    setZoom(null);
     if (event.key === "ArrowRight") setLightbox(Math.min(last, lightbox + 1));
     if (event.key === "ArrowLeft") setLightbox(Math.max(0, lightbox - 1));
   }
@@ -114,7 +117,7 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
                   fill
                   priority={index === 0}
                   sizes="(min-width: 1024px) 48vw, 100vw"
-                  className="object-cover mix-blend-multiply transition-transform duration-(--duration-reveal) ease-brand lg:group-hover/zoom:scale-[1.06]"
+                  className="object-cover transition-transform duration-(--duration-reveal) ease-brand lg:group-hover/zoom:scale-[1.06]"
                 />
               </button>
             </li>
@@ -156,10 +159,24 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
             </button>
             <p
               aria-hidden="true"
-              className="pointer-events-none absolute right-4 bottom-4 rounded-pill bg-background/90 px-3 py-1 text-small text-ink backdrop-blur-sm md:hidden"
+              className="pointer-events-none absolute right-4 bottom-4 rounded-pill bg-background/90 px-3 py-1 text-small text-ink md:hidden"
             >
               {copy.counter(active + 1, images.length)}
             </p>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5 md:hidden"
+            >
+              {images.map((image, index) => (
+                <span
+                  key={image.src}
+                  className={cn(
+                    "size-1.5 rounded-pill bg-background/90 transition-opacity duration-(--duration-micro)",
+                    index === active ? "opacity-100" : "opacity-50",
+                  )}
+                />
+              ))}
+            </span>
           </>
         ) : null}
       </div>
@@ -199,18 +216,41 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
             }}
             className="relative flex h-full w-full items-center justify-center p-4 md:p-10"
           >
-            <div className="relative h-full w-full max-w-5xl">
+            <div
+              onClick={(event) => {
+                const box = event.currentTarget.getBoundingClientRect();
+                setZoom(
+                  zoom
+                    ? null
+                    : {
+                        x: ((event.clientX - box.left) / box.width) * 100,
+                        y: ((event.clientY - box.top) / box.height) * 100,
+                      },
+                );
+              }}
+              className={cn(
+                "relative h-full w-full max-w-5xl overflow-hidden",
+                zoom ? "cursor-zoom-out" : "cursor-zoom-in",
+              )}
+            >
               <Image
                 src={images[lightbox].src}
                 alt={images[lightbox].alt}
                 fill
                 sizes="100vw"
-                className="object-contain"
+                style={zoom ? { transformOrigin: `${zoom.x}% ${zoom.y}%` } : undefined}
+                className={cn(
+                  "object-contain transition-transform duration-(--duration-reveal) ease-brand",
+                  zoom && "scale-[2.2]",
+                )}
               />
             </div>
             <button
               type="button"
-              onClick={() => setLightbox(null)}
+              onClick={() => {
+                setZoom(null);
+                setLightbox(null);
+              }}
               aria-label={copy.close}
               className="absolute top-4 right-4 inline-flex size-11 items-center justify-center rounded-pill bg-background text-ink md:top-6 md:right-6"
             >
@@ -222,7 +262,10 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
                   type="button"
                   aria-label={copy.previous}
                   disabled={lightbox === 0}
-                  onClick={() => setLightbox(lightbox - 1)}
+                  onClick={() => {
+                    setZoom(null);
+                    setLightbox(lightbox - 1);
+                  }}
                   className="absolute left-3 inline-flex size-11 items-center justify-center rounded-pill bg-background text-ink disabled:hidden md:left-6"
                 >
                   <Icon name="chevron-left" />
@@ -231,7 +274,10 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
                   type="button"
                   aria-label={copy.next}
                   disabled={lightbox === last}
-                  onClick={() => setLightbox(lightbox + 1)}
+                  onClick={() => {
+                    setZoom(null);
+                    setLightbox(lightbox + 1);
+                  }}
                   className="absolute right-3 inline-flex size-11 items-center justify-center rounded-pill bg-background text-ink disabled:hidden md:right-6"
                 >
                   <Icon name="chevron-right" />
