@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { IconName } from "@/content/types";
 
-// Line illustrations drawn on a 48 grid to sit with Instrument Serif at display sizes.
+// Line illustrations drawn on a 48 grid to sit with Baskervville at display sizes.
 const PATHS: Record<IconName, ReactNode> = {
   plant: (
     <>

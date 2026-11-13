@@ -129,7 +129,7 @@ export function ProductGallery({ images, title, badges }: ProductGalleryProps) {
             {badges.map((badge) => (
               <li
                 key={badge}
-                className="rounded-pill bg-background/90 px-3 py-1 text-[0.6875rem] font-medium tracking-wide text-ink uppercase backdrop-blur-sm"
+                className="rounded-pill bg-background/90 px-3 py-1 text-xs font-medium tracking-wide text-ink uppercase backdrop-blur-sm"
               >
                 {shop.badges[badge]}
               </li>

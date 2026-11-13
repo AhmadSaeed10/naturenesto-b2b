@@ -27,14 +27,14 @@ export const TOKENS = {
   },
   // Fluid scale tuned for 375px to 1536px viewports.
   text: {
-    display: { size: "clamp(3rem, 1.9rem + 4.7vw, 6.5rem)", leading: "0.95", tracking: "-0.02em" },
-    h1: { size: "clamp(2.5rem, 1.75rem + 3.2vw, 4.75rem)", leading: "0.98", tracking: "-0.02em" },
-    h2: { size: "clamp(2rem, 1.45rem + 2.3vw, 3.5rem)", leading: "1", tracking: "-0.015em" },
-    h3: { size: "clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem)", leading: "1.05", tracking: "-0.01em" },
-    h4: { size: "clamp(1.25rem, 1.1rem + 0.6vw, 1.625rem)", leading: "1.15", tracking: "-0.005em" },
+    display: { size: "clamp(3rem, 1.9rem + 4.7vw, 6.5rem)", leading: "1", tracking: "-0.015em" },
+    h1: { size: "clamp(2.5rem, 1.75rem + 3.2vw, 4.75rem)", leading: "1.05", tracking: "-0.01em" },
+    h2: { size: "clamp(2rem, 1.45rem + 2.3vw, 3.5rem)", leading: "1.08", tracking: "-0.01em" },
+    h3: { size: "clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem)", leading: "1.12", tracking: "-0.005em" },
+    h4: { size: "clamp(1.25rem, 1.1rem + 0.6vw, 1.625rem)", leading: "1.2", tracking: "0em" },
     lead: { size: "clamp(1.125rem, 1.05rem + 0.35vw, 1.375rem)", leading: "1.5", tracking: "0em" },
-    body: { size: "1rem", leading: "1.6", tracking: "0em" },
-    small: { size: "0.875rem", leading: "1.5", tracking: "0em" },
+    body: { size: "1.0625rem", leading: "1.6", tracking: "0em" },
+    small: { size: "0.9375rem", leading: "1.5", tracking: "0em" },
     eyebrow: { size: "0.75rem", leading: "1.2", tracking: "0.18em" },
   },
   motion: {

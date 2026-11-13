@@ -139,7 +139,7 @@ export function RichTextEditor({
               <span
                 aria-hidden="true"
                 className={
-                  tool.action === "bold" ? "font-bold" : tool.action === "italic" ? "italic" : ""
+                  tool.action === "bold" ? "font-medium" : tool.action === "italic" ? "italic" : ""
                 }
               >
                 {tool.glyph}

@@ -9,7 +9,7 @@ const HEADINGS = { h1: motion.h1, h2: motion.h2, h3: motion.h3 } as const;
 interface SplitHeadingProps {
   as?: keyof typeof HEADINGS;
   text: string;
-  /** Words rendered in Instrument Serif italic, matched ignoring punctuation and case. */
+  /** Words rendered in Baskervville italic, matched ignoring punctuation and case. */
   emphasis?: readonly string[];
   id?: string;
   className?: string;

@@ -14,7 +14,7 @@ function Inlines({ nodes }: { nodes: Inline[] }) {
         return <br key={index} />;
       case "strong":
         return (
-          <strong key={index} className="font-semibold">
+          <strong key={index} className="font-medium">
             <Inlines nodes={node.children} />
           </strong>
         );

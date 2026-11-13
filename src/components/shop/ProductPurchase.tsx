@@ -261,7 +261,7 @@ export function ProductPurchase({ product, whatsappHref, pots = [], image }: Pro
                             className="object-cover"
                           />
                         </span>
-                        <span className="line-clamp-1 text-[0.8125rem]">{entry.name}</span>
+                        <span className="line-clamp-1 text-xs">{entry.name}</span>
                       </button>
                     </li>
                   );

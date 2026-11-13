@@ -38,7 +38,7 @@ export function CartLink({ initialCount }: { initialCount: number }) {
         {count > 0 ? (
           <span
             aria-hidden="true"
-            className="absolute top-1 right-0.5 min-w-5 rounded-pill bg-primary-dark px-1 text-center text-[0.6875rem] leading-5 font-medium text-background"
+            className="absolute top-1 right-0.5 min-w-5 rounded-pill bg-primary-dark px-1 text-center text-xs leading-5 font-medium text-background"
           >
             {count > 99 ? "99+" : count}
           </span>
