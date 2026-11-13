@@ -65,7 +65,7 @@ export function specRows(entry: CatalogueEntry): { label: string; value: string 
   return rows.flatMap(([label, value]) => (value ? [{ label, value }] : []));
 }
 
-export const catalogue: CatalogueEntry[] = [
+const entries: CatalogueEntry[] = [
   // Indoor plants
   {
     handle: "monstera",
@@ -615,3 +615,44 @@ export const catalogue: CatalogueEntry[] = [
     included: ["One 1 kg pack of plant feed"],
   },
 ];
+
+// Every product gets up to four frames: its own photo, any species-specific extras, then shared
+// styling frames (a room scene, a pot detail, a care shot) rotated by position so neighbouring
+// products do not repeat the same set. flag: stand-in frames, replace with the studio's own.
+const GALLERY_SIZE = 4;
+const FRAMES: Record<CatalogueKind, PhotoKey[][]> = {
+  plant: [
+    ["room-plants-a", "room-plants-b", "shelf", "office", "table-plants", "floor-room"],
+    ["terracotta-stack", "pot-black", "pot-bw"],
+    ["watering-can", "spray-bottle", "potting"],
+  ],
+  pot: [
+    ["room-plants-a", "room-plants-b", "shelf", "table-plants", "office"],
+    ["monstera-pot", "money-plant", "jade-a", "snake-a", "zz-a"],
+    ["potting", "soil-bag", "watering-can"],
+  ],
+  care: [
+    ["room-plants-b", "table-plants", "office", "shelf"],
+    ["monstera-pot", "pothos-shelf", "fiddle-a"],
+    ["potting", "watering-can", "soil-bag", "spray-bottle"],
+  ],
+};
+
+function withGallery(entry: CatalogueEntry, index: number): CatalogueEntry {
+  const gallery = [...(entry.gallery ?? [])];
+  const used = new Set<PhotoKey>([entry.photo, ...gallery]);
+  for (const pool of FRAMES[entry.kind]) {
+    if (1 + gallery.length >= GALLERY_SIZE) break;
+    for (let step = 0; step < pool.length; step++) {
+      const key = pool[(index + step) % pool.length];
+      if (key && !used.has(key)) {
+        gallery.push(key);
+        used.add(key);
+        break;
+      }
+    }
+  }
+  return { ...entry, gallery };
+}
+
+export const catalogue: CatalogueEntry[] = entries.map(withGallery);
