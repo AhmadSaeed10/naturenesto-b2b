@@ -17,6 +17,9 @@ export const shop = {
     onlyLeft: (n: number) => `Only ${n} left`,
     soldOut: "Sold out",
     sale: "Sale",
+    salePercent: (n: number) => `Save ${n}%`,
+    ratingLabel: (average: number, count: number) =>
+      `Rated ${average} out of 5 from ${count} ${count === 1 ? "review" : "reviews"}`,
     // Short care words for the printed line under the name.
     careShort: {
       light: { low: "Low light", medium: "Medium light", bright: "Bright light" },
@@ -36,6 +39,8 @@ export const shop = {
       "price-asc": "Price, low to high",
       "price-desc": "Price, high to low",
       name: "Name",
+      newest: "New arrivals",
+      bestseller: "Bestsellers first",
     },
     light: "Light",
     pets: "Pets",
@@ -44,7 +49,22 @@ export const shop = {
     inStock: "In stock only",
     clear: "Clear filters",
     noMatch: "Nothing matches those filters.",
-    results: (n: number) => `${n} ${n === 1 ? "plant" : "plants"}`,
+    results: (n: number) => `${n} ${n === 1 ? "product" : "products"}`,
+    search: "Search products",
+    searchPlaceholder: "Search by name",
+    category: "Category",
+    price: "Price",
+    prices: {
+      under1000: "Under Rs 1,000",
+      "1000-3000": "Rs 1,000 to 3,000",
+      "3000-6000": "Rs 3,000 to 6,000",
+      over6000: "Rs 6,000 and over",
+    },
+  },
+  all: {
+    title: "All products",
+    chip: "All",
+    description: "Plants, pots and plant care in one place.",
   },
   tile: {
     title: "Not sure which plant suits your space?",
