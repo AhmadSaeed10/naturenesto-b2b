@@ -7,10 +7,19 @@ interface PolicyLayoutProps {
   intro: string;
   updated?: string;
   sections: PolicySection[];
+  /** Optional block between the intro and the long text, such as key facts. */
+  lead?: React.ReactNode;
 }
 
 /** Long reading pages: sticky contents list on the left, plain prose on the right. */
-export function PolicyLayout({ eyebrow, title, intro, updated, sections }: PolicyLayoutProps) {
+export function PolicyLayout({
+  eyebrow,
+  title,
+  intro,
+  updated,
+  sections,
+  lead,
+}: PolicyLayoutProps) {
   return (
     <div className="mx-auto max-w-7xl px-4 pt-12 pb-20 md:px-8 md:pt-20 md:pb-28">
       <header className="flex max-w-2xl flex-col gap-5 pb-12 md:pb-16">
@@ -19,6 +28,7 @@ export function PolicyLayout({ eyebrow, title, intro, updated, sections }: Polic
         <p className="text-lead text-ink-muted">{intro}</p>
         {updated ? <p className="text-small text-ink-muted">{updated}</p> : null}
       </header>
+      {lead}
       <div className="grid gap-12 border-t border-line pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)] lg:gap-20">
         <nav aria-label={title} className="lg:sticky lg:top-28 lg:self-start">
           <ol className="flex flex-col gap-1 text-small">
