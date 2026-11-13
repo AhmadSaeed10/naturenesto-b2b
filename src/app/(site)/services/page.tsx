@@ -1,8 +1,11 @@
 import { SplitHeading } from "@/components/motion/SplitHeading";
+import { StatsBand } from "@/components/pages/StatsBand";
+import { Testimonials } from "@/components/pages/Testimonials";
 import { QUOTE_ID, QuoteSection } from "@/components/forms/QuoteSection";
 import { ServicesGrid } from "@/components/sections/ServicesGrid";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/Eyebrow";
+import { servicesIndex, stats, testimonials } from "@/content/pages-extra";
 import { quote } from "@/content/quote";
 import { seo } from "@/content/seo";
 import { site } from "@/content/site";
@@ -29,6 +32,8 @@ export default function ServicesPage() {
         </div>
       </section>
       <ServicesGrid />
+      <StatsBand items={stats} />
+      <Testimonials {...testimonials} {...servicesIndex.testimonials} />
       <QuoteSection />
     </>
   );

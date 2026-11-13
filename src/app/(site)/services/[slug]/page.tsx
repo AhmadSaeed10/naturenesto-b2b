@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { QUOTE_ID, QuoteSection } from "@/components/forms/QuoteSection";
 import { Reveal } from "@/components/motion/Reveal";
 import { SplitHeading } from "@/components/motion/SplitHeading";
+import { HelpStrip } from "@/components/pages/HelpStrip";
 import { ServicesGrid } from "@/components/sections/ServicesGrid";
 import { BrandIcon } from "@/components/ui/BrandIcon";
 import { Button } from "@/components/ui/Button";
@@ -74,6 +75,7 @@ export default async function ServicePage({ params }: PageProps<"/services/[slug
       <div className="pt-20 md:pt-28">
         <ServicesGrid />
       </div>
+      <HelpStrip />
     </>
   );
 }

@@ -3,6 +3,7 @@ import { EnquiryPage } from "@/components/forms/EnquiryPage";
 import { forms } from "@/content/forms";
 import { needHelp } from "@/content/home";
 import { footerVisit } from "@/content/nav";
+import { contactExtra } from "@/content/pages-extra";
 import { site } from "@/content/site";
 import { seo } from "@/content/seo";
 import { pageMetadata } from "@/lib/seo";
@@ -36,6 +37,11 @@ export default function ContactPage() {
               </a>
             </li>
           ))}
+          <li>
+            <p className="eyebrow text-ink-muted">{contactExtra.hoursLabel}</p>
+            <p>{contactExtra.hours}</p>
+            <p className="max-w-xs text-small text-ink-muted">{contactExtra.note}</p>
+          </li>
           <li>
             <p className="eyebrow text-ink-muted">{footerVisit.heading}</p>
             <address className="max-w-xs not-italic">{footerVisit.address}</address>

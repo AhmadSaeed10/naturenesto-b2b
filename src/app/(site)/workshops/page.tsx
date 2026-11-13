@@ -1,10 +1,14 @@
 import Image from "next/image";
 import { RichText } from "@/components/cms/RichText";
 import { Reveal } from "@/components/motion/Reveal";
+import { PhotoMosaic } from "@/components/pages/PhotoMosaic";
+import { ProcessCards } from "@/components/pages/ProcessCards";
+import { Testimonials } from "@/components/pages/Testimonials";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { StubPage } from "@/components/ui/StubPage";
 import { cms } from "@/content/cms";
+import { mosaic, testimonials, workshops as extra } from "@/content/pages-extra";
 import { stubPages } from "@/content/pages";
 import { seo } from "@/content/seo";
 import { type Workshop, getWorkshopGroups } from "@/lib/cms/content";
@@ -84,28 +88,39 @@ function WorkshopCard({ workshop }: { workshop: Workshop }) {
 export default async function WorkshopsPage() {
   const { upcoming, past } = await getWorkshopGroups();
   if (upcoming.length + past.length === 0) {
-    return <StubPage title={stub?.title ?? copy.title} body={stub?.todo ?? ""} />;
+    return (
+      <>
+        <StubPage title={stub?.title ?? copy.title} body={stub?.todo ?? ""} />
+        <ProcessCards eyebrow={extra.eyebrow} title={extra.title} steps={extra.steps} />
+        <PhotoMosaic images={mosaic} />
+      </>
+    );
   }
 
   return (
-    <section className="mx-auto flex max-w-7xl flex-col gap-12 px-4 py-20 md:px-8 lg:py-28">
-      <Reveal className="flex flex-col gap-6">
-        <Eyebrow>{copy.eyebrow}</Eyebrow>
-        <h1 className="text-h1">{copy.title}</h1>
-      </Reveal>
-      {[
-        { title: copy.upcoming, list: upcoming },
-        { title: copy.past, list: past },
-      ]
-        .filter((group) => group.list.length > 0)
-        .map((group) => (
-          <section key={group.title} className="flex flex-col gap-6">
-            <h2 className="eyebrow text-ink-muted">{group.title}</h2>
-            {group.list.map((workshop) => (
-              <WorkshopCard key={workshop.handle} workshop={workshop} />
-            ))}
-          </section>
-        ))}
-    </section>
+    <>
+      <section className="mx-auto flex max-w-7xl flex-col gap-12 px-4 py-20 md:px-8 lg:py-28">
+        <Reveal className="flex flex-col gap-6">
+          <Eyebrow>{copy.eyebrow}</Eyebrow>
+          <h1 className="text-h1">{copy.title}</h1>
+        </Reveal>
+        {[
+          { title: copy.upcoming, list: upcoming },
+          { title: copy.past, list: past },
+        ]
+          .filter((group) => group.list.length > 0)
+          .map((group) => (
+            <section key={group.title} className="flex flex-col gap-6">
+              <h2 className="eyebrow text-ink-muted">{group.title}</h2>
+              {group.list.map((workshop) => (
+                <WorkshopCard key={workshop.handle} workshop={workshop} />
+              ))}
+            </section>
+          ))}
+      </section>
+      <ProcessCards eyebrow={extra.eyebrow} title={extra.title} steps={extra.steps} />
+      <Testimonials {...testimonials} />
+      <PhotoMosaic images={mosaic} />
+    </>
   );
 }
