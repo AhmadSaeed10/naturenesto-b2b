@@ -22,7 +22,13 @@ function mediaPatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
-  images: { remotePatterns: mediaPatterns() },
+  images: {
+    // Unsplash hosts the stand-in photography (src/content/photos.ts); the media bucket holds uploads.
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com", pathname: "/photo-*" },
+      ...(mediaPatterns() ?? []),
+    ],
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {
