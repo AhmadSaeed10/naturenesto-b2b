@@ -9,11 +9,14 @@ import { writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { catalogCategories } from "../src/content/catalog.ts";
+import { catalogue, defaultIncluded, specRows } from "../src/content/catalogue.ts";
+import { photos, photoUrl } from "../src/content/photos.ts";
+import { sampleCare } from "../src/content/sample-care.ts";
+import { toRichText } from "../src/lib/cms/rich-text.ts";
 import { categories, categoriesTitle } from "../src/content/categories.ts";
 import { banner, hero, needHelp, taglineStrip, valueProps } from "../src/content/home.ts";
 import { footerColumns, headerCta, headerNav } from "../src/content/nav.ts";
 import { redirects } from "../src/content/redirects.ts";
-import { sampleProducts } from "../src/content/sample-products.ts";
 import { seo } from "../src/content/seo.ts";
 import { services, servicesEyebrow } from "../src/content/services.ts";
 import { site } from "../src/content/site.ts";
@@ -41,14 +44,24 @@ const literal = (value: SqlValue): string => {
   return `${literal(JSON.stringify(value))}::jsonb`;
 };
 
-const insert = (table: string, rows: Record<string, SqlValue>[], conflict = "id"): string => {
+const insert = (
+  table: string,
+  rows: Record<string, SqlValue>[],
+  conflict = "id",
+  /** Columns refreshed on re-seed; empty keeps existing rows untouched. */
+  update: string[] = [],
+): string => {
   const first = rows[0];
   if (!first) return "";
   const columns = Object.keys(first);
   const values = rows
     .map((row) => `  (${columns.map((column) => literal(row[column])).join(", ")})`)
     .join(",\n");
-  return `insert into public.${table} (${columns.join(", ")}) values\n${values}\non conflict (${conflict}) do nothing;\n`;
+  return `insert into public.${table} (${columns.join(", ")}) values\n${values}\n${
+    update.length > 0
+      ? `on conflict (${conflict}) do update set ${update.map((c) => `${c} = excluded.${c}`).join(", ")};\n`
+      : `on conflict (${conflict}) do nothing;\n`
+  }`;
 };
 
 const toPaisa = (rupees: number): number => Math.round(rupees * 100);
@@ -175,51 +188,84 @@ const redirectRows = insert(
   "source",
 );
 
-// Sample catalogue: drafts, so the storefront keeps its sample fallback until real products
-// are activated in Admin. Images are the placeholder files already served by the site.
+// Catalogue (src/content/catalogue.ts). New products start as drafts so nothing goes live by
+// accident; products that already exist keep their status and stock but take the refreshed
+// copy, price and photos, so re-running the seed updates the shop to this catalogue.
+const photoKeys = [
+  ...new Set(catalogue.flatMap((entry) => [entry.photo, ...(entry.gallery ?? [])])),
+];
 const media = insert(
   "media_assets",
-  [...new Set(sampleProducts.map((product) => product.image.src))].map((src) => ({
-    id: id(`media:${src}`),
-    external_url: src,
-    mime_type: "image/webp",
-    decorative: true,
-    alt: "",
-    title: "Placeholder product image",
+  photoKeys.map((key) => ({
+    id: id(`media:${photoUrl(key)}`),
+    external_url: photoUrl(key),
+    mime_type: "image/jpeg",
+    decorative: false,
+    alt: photos[key].alt,
+    title: `${photos[key].alt} (photo by ${photos[key].credit}, Unsplash)`,
   })),
 );
 const products = insert(
   "products",
-  sampleProducts.map((product) => ({
-    id: id(`product:${product.id}`),
-    handle: product.id,
-    title: product.name,
+  catalogue.map((entry) => ({
+    id: id(`product:${entry.handle}`),
+    handle: entry.handle,
+    title: entry.name,
     status: "draft",
     vendor: site.name,
-    tags: [...product.categories, ...(product.badges ?? []).map((badge) => `badge:${badge}`)],
+    product_type: { plant: "Plant", pot: "Pot & planter", care: "Plant care" }[entry.kind],
+    tags: [...entry.categories, ...(entry.badges ?? []).map((badge) => `badge:${badge}`)],
+    description: toRichText(entry.description),
+    short_description: entry.short,
+    specs: specRows(entry),
+    included: entry.included ?? defaultIncluded(entry.kind),
+    care: { ...sampleCare[entry.handle], size: entry.size },
   })),
+  "id",
+  [
+    "title",
+    "vendor",
+    "product_type",
+    "tags",
+    "description",
+    "short_description",
+    "specs",
+    "included",
+    "care",
+  ],
 );
 const variants = insert(
   "product_variants",
-  sampleProducts.map((product) => ({
-    id: id(`variant:${product.id}`),
-    product_id: id(`product:${product.id}`),
-    title: product.size ?? "Default",
-    sku: `SAMPLE-${product.id.toUpperCase()}`,
-    price: toPaisa(product.price),
-    compare_at_price: product.compareAtPrice ? toPaisa(product.compareAtPrice) : null,
-    stock: product.inStock ? 10 : 0,
+  catalogue.map((entry) => ({
+    id: id(`variant:${entry.handle}`),
+    product_id: id(`product:${entry.handle}`),
+    title: entry.size,
+    sku: `NN-${entry.handle.toUpperCase()}`,
+    price: toPaisa(entry.price),
+    compare_at_price: entry.compareAtPrice ? toPaisa(entry.compareAtPrice) : null,
+    stock: entry.inStock === false ? 0 : 10,
   })),
+  "id",
+  ["title", "sku", "price", "compare_at_price"],
 );
 const images = insert(
   "product_images",
-  sampleProducts.map((product) => ({
-    id: id(`image:${product.id}`),
-    product_id: id(`product:${product.id}`),
-    media_id: id(`media:${product.image.src}`),
-    position: 0,
-  })),
+  catalogue.flatMap((entry) =>
+    [entry.photo, ...(entry.gallery ?? [])].map((key, index) => ({
+      // Position 0 keeps the id it always had, so the first photo replaces the old placeholder.
+      id: id(index === 0 ? `image:${entry.handle}` : `image:${entry.handle}:${index}`),
+      product_id: id(`product:${entry.handle}`),
+      media_id: id(`media:${photoUrl(key)}`),
+      position: index,
+    })),
+  ),
+  "id",
+  ["media_id", "position"],
 );
+
+// The old placeholder artwork is dropped from products so it never shows beside the photos.
+const dropPlaceholders = `delete from public.product_images pi using public.media_assets m
+  where pi.media_id = m.id and m.external_url like '/images/products/%';\n`;
 
 const sql = [
   "-- Generated by scripts/seed-content.ts from src/content. Do not edit by hand.\n",
@@ -234,6 +280,7 @@ const sql = [
   media,
   products,
   variants,
+  dropPlaceholders,
   images,
 ].join("\n");
 

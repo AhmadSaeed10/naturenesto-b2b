@@ -1,6 +1,8 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { catalogCategories } from "@/content/catalog";
+import { catalogue, defaultIncluded, specRows } from "@/content/catalogue";
+import { photos, photoUrl } from "@/content/photos";
 import { sampleCare } from "@/content/sample-care";
 import { sampleProducts } from "@/content/sample-products";
 import type { CatalogSlug, ProductBadge } from "@/content/types";
@@ -104,15 +106,17 @@ export async function getProduct(handle: string): Promise<StoreProduct | null> {
 function sampleStoreProduct(handle: string): StoreProduct | null {
   const sample = sampleProducts.find((product) => product.id === handle);
   if (!sample) return null;
+  const entry = catalogue.find((item) => item.handle === handle);
+  const keys = entry ? [entry.photo, ...(entry.gallery ?? [])] : [];
   return {
     source: "sample",
     id: `sample:${sample.id}`,
     handle: sample.id,
     title: sample.name,
-    description: "",
-    shortDescription: "",
-    specs: [],
-    included: [],
+    description: entry?.description ?? "",
+    shortDescription: entry?.short ?? "",
+    specs: entry ? specRows(entry) : [],
+    included: entry ? (entry.included ?? defaultIncluded(entry.kind)) : [],
     relatedHandles: [],
     productType: null,
     vendor: null,
@@ -139,7 +143,9 @@ function sampleStoreProduct(handle: string): StoreProduct | null {
         imageSrc: null,
       },
     ],
-    images: [{ src: sample.image.src, alt: sample.name }],
+    images: keys.length
+      ? keys.map((key) => ({ src: photoUrl(key, 1400), alt: photos[key].alt }))
+      : [{ src: sample.image.src, alt: sample.name }],
   };
 }
 

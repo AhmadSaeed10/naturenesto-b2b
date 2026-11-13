@@ -28,4 +28,13 @@ export const sampleCare: Record<string, Facts> = {
   hibiscus: { light: "bright", water: "frequent", level: "moderate" },
   "olive-tree": { light: "bright", water: "low", level: "easy" },
   "bird-of-paradise": { light: "bright", water: "moderate", level: "moderate" },
+  "chinese-money-plant": { light: "medium", water: "moderate", pet: "safe", level: "easy" },
+  "heartleaf-philodendron": { light: "medium", water: "moderate", pet: "toxic", level: "easy" },
+  "hoya-trio": { light: "bright", water: "low", pet: "safe", level: "easy" },
+  anthurium: { light: "medium", water: "moderate", pet: "toxic", level: "moderate" },
+  lavender: { light: "bright", water: "low", level: "easy" },
+  "herb-duo": { light: "bright", water: "moderate", level: "easy" },
+  "cactus-collection": { light: "bright", water: "low", level: "easy" },
+  "succulent-table-set": { light: "bright", water: "low", level: "easy" },
+  "motia-jasmine": { light: "bright", water: "moderate", level: "easy" },
 };
