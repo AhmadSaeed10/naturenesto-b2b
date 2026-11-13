@@ -7,7 +7,13 @@ import { parseCare } from "@/lib/care";
 import { mediaUrl } from "@/lib/media";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, isDatabaseConfigured } from "@/lib/db";
-import { mediaAssets, productImages, products, productVariants } from "@/lib/db/schema";
+import {
+  mediaAssets,
+  productImages,
+  productReviews,
+  products,
+  productVariants,
+} from "@/lib/db/schema";
 import { goneLive } from "@/lib/db/visibility";
 
 export type CatalogSource = "database" | "sample";
@@ -29,7 +35,7 @@ const isBadge = (value: string): value is ProductBadge =>
   (BADGES as readonly string[]).includes(value);
 const byPosition = <T extends { position: number }>(a: T, b: T): number => a.position - b.position;
 
-async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
+async function fetchFromDatabase(slug: CatalogSlug | null): Promise<Product[] | null> {
   if (!isDatabaseConfigured()) return null;
   try {
     const rows = await db()
@@ -46,14 +52,15 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
           eq(products.status, "active"),
           goneLive(products.publishAt),
           isNull(products.deletedAt),
-          sql`${products.tags} @> ARRAY[${slug}]::text[]`,
+          slug ? sql`${products.tags} @> ARRAY[${slug}]::text[]` : undefined,
         ),
       )
       .orderBy(asc(products.title));
     if (rows.length === 0) return [];
     const ids = rows.map((row) => row.id);
 
-    const [variantRows, imageRows] = await Promise.all([
+    const handles = rows.map((row) => row.handle);
+    const [variantRows, imageRows, ratingRows] = await Promise.all([
       db().select().from(productVariants).where(inArray(productVariants.productId, ids)),
       db()
         .select({
@@ -68,7 +75,17 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
         .from(productImages)
         .innerJoin(mediaAssets, eq(mediaAssets.id, productImages.mediaId))
         .where(inArray(productImages.productId, ids)),
+      db()
+        .select({
+          handle: productReviews.handle,
+          average: sql<number>`round(avg(${productReviews.rating})::numeric, 1)::float`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(productReviews)
+        .where(and(inArray(productReviews.handle, handles), eq(productReviews.status, "published")))
+        .groupBy(productReviews.handle),
     ]);
+    const ratings = new Map(ratingRows.map((r) => [r.handle, r]));
 
     return rows.flatMap((row): Product[] => {
       const variants = variantRows.filter((v) => v.productId === row.id).sort(byPosition);
@@ -98,6 +115,12 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
               ? Math.min(...lows.map((v) => v.stock))
               : undefined,
           fromPrice: prices.size > 1,
+          rating: ratings.get(row.handle)
+            ? {
+                average: ratings.get(row.handle)?.average ?? 0,
+                count: ratings.get(row.handle)?.count ?? 0,
+              }
+            : undefined,
           name: row.title,
           price: Math.min(...variants.map((v) => v.price)) / PAISA_PER_RUPEE,
           compareAtPrice:
@@ -133,16 +156,18 @@ async function fetchFromDatabase(slug: CatalogSlug): Promise<Product[] | null> {
  * Products for one category. Uses the database when it is configured and returns active
  * products; otherwise falls back to the sample catalogue so pages never render empty.
  */
-export async function getCatalog(slug: CatalogSlug): Promise<CatalogResult> {
+export async function getCatalog(slug: CatalogSlug | null): Promise<CatalogResult> {
   "use cache";
   cacheLife("hours");
-  cacheTag("products", `products:${slug}`);
+  cacheTag("products", `products:${slug ?? "all"}`);
 
   const live = await fetchFromDatabase(slug);
   if (live && live.length > 0) return { products: live, source: "database" };
 
   return {
-    products: sampleProducts.filter((product) => product.categories.includes(slug)),
+    products: slug
+      ? sampleProducts.filter((product) => product.categories.includes(slug))
+      : sampleProducts,
     source: "sample",
   };
 }

@@ -143,4 +143,6 @@ export interface Product {
   lowStock?: number;
   /** True when variants have different prices, so the card says "From". */
   fromPrice?: boolean;
+  /** Published review average and count; absent when there are no reviews. */
+  rating?: { average: number; count: number };
 }

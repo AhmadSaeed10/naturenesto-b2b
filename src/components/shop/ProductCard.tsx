@@ -7,6 +7,7 @@ import type { Product } from "@/content/types";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { QuickAdd } from "./QuickAdd";
+import { Stars } from "./Stars";
 
 interface ProductCardProps {
   product: Product;
@@ -34,12 +35,18 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
   const price = formatPrice(product.price);
   const enquiry = `${whatsappHref}?text=${encodeURIComponent(shop.whatsappMessage(product.name, price))}`;
   const line = careLine(product);
+  const percentOff =
+    product.compareAtPrice && product.compareAtPrice > product.price
+      ? Math.round((1 - product.price / product.compareAtPrice) * 100)
+      : 0;
   const badge = product.badges?.find((b) => b === "new" || b === "bestseller");
   // One printed tag at most: sold out beats sale beats the badge.
   const tag = !product.inStock
     ? shop.card.soldOut
     : product.compareAtPrice
-      ? shop.card.sale
+      ? percentOff
+        ? shop.card.salePercent(percentOff)
+        : shop.card.sale
       : badge
         ? shop.badges[badge]
         : null;
@@ -56,7 +63,7 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
         />
         {/* The photo is mounted like a postage stamp, the same edge as the homepage drawing. */}
         <div className="relative bg-surface stamp">
-          <div className="relative aspect-[3/4] overflow-hidden bg-surface">
+          <div className="relative aspect-[4/5] overflow-hidden bg-surface">
             <Image
               src={product.image.src}
               alt={product.image.alt}
@@ -64,7 +71,7 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
               sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
               priority={priority}
               className={cn(
-                "object-cover mix-blend-multiply transition-[transform,opacity] duration-(--duration-reveal) ease-brand group-hover:scale-[1.05]",
+                "object-cover transition-[transform,opacity] duration-(--duration-reveal) ease-brand group-hover:scale-[1.05]",
                 product.hoverImage && "pointer-fine:group-hover:opacity-0",
                 !product.inStock && "opacity-60 grayscale",
               )}
@@ -76,7 +83,7 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
                 alt=""
                 fill
                 sizes="(min-width: 1024px) 25vw, 33vw"
-                className="hidden object-cover opacity-0 mix-blend-multiply transition-opacity duration-(--duration-reveal) ease-brand group-hover:opacity-100 pointer-fine:block"
+                className="hidden object-cover opacity-0 transition-opacity duration-(--duration-reveal) ease-brand group-hover:opacity-100 pointer-fine:block"
               />
             ) : null}
 
@@ -118,7 +125,20 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
             ) : null}
           </p>
         </div>
-        {product.size ? <p className="text-small text-ink-muted">{product.size}</p> : null}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {product.size ? <p className="text-small text-ink-muted">{product.size}</p> : null}
+          {product.rating ? (
+            <p
+              className="inline-flex items-center gap-1.5 text-small text-ink-muted"
+              aria-label={shop.card.ratingLabel(product.rating.average, product.rating.count)}
+            >
+              <Stars value={product.rating.average} size={13} />
+              <span aria-hidden="true">
+                {product.rating.average} ({product.rating.count})
+              </span>
+            </p>
+          ) : null}
+        </div>
         {line.length > 0 ? <p className="mt-2 eyebrow text-ink-muted">{line.join(" · ")}</p> : null}
         {product.lowStock && product.inStock ? (
           <p className="text-small font-medium text-primary-dark">
