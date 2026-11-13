@@ -254,38 +254,41 @@ export function ShopGrid({ products, whatsappHref, showCategories = false }: Sho
           </Button>
         </div>
       ) : (
-        <Stagger
-          as="ul"
-          key={`${light}-${petSafe}-${easy}-${inStock}-${sort}-${category}-${band}-${needle}`}
-          className="grid grid-cols-2 gap-x-4 gap-y-14 pb-12 sm:grid-cols-3 lg:grid-cols-4 lg:gap-x-6"
-        >
-          {shown.flatMap((product, index) => [
-            ...(index === TILE_AT && shown.length > TILE_AT + 1
-              ? [
-                  <StaggerItem as="li" key="tile" className="min-w-0">
-                    <div className="relative flex h-full min-h-80 flex-col justify-between gap-6 rounded-card bg-ink p-6 text-background">
-                      <FrameCorners className="m-3 text-background/30" />
-                      <h3 className="font-serif text-h3 leading-tight">{shop.tile.title}</h3>
-                      <div className="flex flex-col items-start gap-4">
-                        <p className="text-small">{shop.tile.body}</p>
-                        <Button
-                          href="/consultation"
-                          variant="secondary"
-                          withArrow
-                          className="border-background px-4! py-2 text-center whitespace-normal! text-background"
-                        >
-                          {shop.tile.cta}
-                        </Button>
+        <>
+          <h2 className="sr-only">{shop.listTitle}</h2>
+          <Stagger
+            as="ul"
+            key={`${light}-${petSafe}-${easy}-${inStock}-${sort}-${category}-${band}-${needle}`}
+            className="grid grid-cols-2 gap-x-4 gap-y-14 pb-12 sm:grid-cols-3 lg:grid-cols-4 lg:gap-x-6"
+          >
+            {shown.flatMap((product, index) => [
+              ...(index === TILE_AT && shown.length > TILE_AT + 1
+                ? [
+                    <StaggerItem as="li" key="tile" className="min-w-0">
+                      <div className="relative flex h-full min-h-80 flex-col justify-between gap-6 rounded-card bg-ink p-6 text-background">
+                        <FrameCorners className="m-3 text-background/30" />
+                        <h3 className="font-serif text-h3 leading-tight">{shop.tile.title}</h3>
+                        <div className="flex flex-col items-start gap-4">
+                          <p className="text-small">{shop.tile.body}</p>
+                          <Button
+                            href="/consultation"
+                            variant="secondary"
+                            withArrow
+                            className="max-w-full border-background px-4! py-2 text-center whitespace-normal! text-background"
+                          >
+                            {shop.tile.cta}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </StaggerItem>,
-                ]
-              : []),
-            <StaggerItem as="li" key={product.id} className="min-w-0">
-              <ProductCard product={product} whatsappHref={whatsappHref} priority={index < 4} />
-            </StaggerItem>,
-          ])}
-        </Stagger>
+                    </StaggerItem>,
+                  ]
+                : []),
+              <StaggerItem as="li" key={product.id} className="min-w-0">
+                <ProductCard product={product} whatsappHref={whatsappHref} priority={index < 4} />
+              </StaggerItem>,
+            ])}
+          </Stagger>
+        </>
       )}
     </div>
   );

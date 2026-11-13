@@ -61,6 +61,8 @@ export const shop = {
       over6000: "Rs 6,000 and over",
     },
   },
+  /** Screen reader heading for the product list, keeps the heading order h1, h2, h3. */
+  listTitle: "Products",
   all: {
     title: "All products",
     chip: "All",

@@ -18,7 +18,7 @@ export function FactCards({ items, flush = false }: FactCardsProps) {
             className="flex flex-col gap-3 rounded-card bg-surface p-6 md:p-8"
           >
             <span className="eyebrow text-ink-muted">{item.label}</span>
-            <h3 className="font-serif text-h4">{item.title}</h3>
+            <h2 className="font-serif text-h4">{item.title}</h2>
             <p className="text-small text-ink-muted">{item.body}</p>
           </StaggerItem>
         ))}
