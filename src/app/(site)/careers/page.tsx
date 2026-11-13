@@ -1,8 +1,11 @@
 import { Reveal } from "@/components/motion/Reveal";
 import { PageHero } from "@/components/pages/PageHero";
+import { ProcessCards } from "@/components/pages/ProcessCards";
+import { TeamGrid } from "@/components/pages/TeamGrid";
 import { ValueGrid } from "@/components/pages/ValueGrid";
 import { Button } from "@/components/ui/Button";
 import { careersPage as copy } from "@/content/pages-copy";
+import { careers, team } from "@/content/pages-extra";
 import { seo } from "@/content/seo";
 import { pageMetadata } from "@/lib/seo";
 
@@ -17,6 +20,13 @@ export default function CareersPage() {
     <>
       <PageHero eyebrow={copy.eyebrow} title={copy.title} intro={copy.intro} image={copy.image} />
       <ValueGrid title={copy.whyTitle} items={copy.why} />
+      <ValueGrid title={careers.perksTitle} items={careers.perks} />
+      <TeamGrid {...team} />
+      <ProcessCards
+        eyebrow={careers.hiringEyebrow}
+        title={careers.hiringTitle}
+        steps={careers.hiringSteps}
+      />
       <section className="mx-auto max-w-3xl px-4 py-16 md:px-8 md:py-24">
         <Reveal className="flex flex-col gap-6">
           <h2 className="text-h2">{copy.rolesTitle}</h2>
