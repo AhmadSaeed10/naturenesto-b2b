@@ -1,11 +1,23 @@
+import { type PhotoKey, photoUrl } from "./photos";
 import type { Category, ImageAsset } from "./types";
 
-// Placeholder art generated for the rebuild. The tile label names the link, so the image
-// is decorative (empty alt). Replace with real photography before launch.
+// Stand-in photography (src/content/photos.ts). The tile label names the link, so the image
+// is decorative (empty alt). Replace with the studio's own photography before launch.
+const TILE_PHOTOS: Record<string, PhotoKey> = {
+  "indoor-plants": "pothos-shelf",
+  "outdoor-plants": "bougain-a",
+  "pet-friendly": "spider-a",
+  "easy-care": "snake-a",
+  orchids: "phal-white",
+  "large-plants": "fiddle-a",
+  "low-light": "zz-a",
+  "plant-care": "potting",
+};
+
 const tileImage = (slug: string): ImageAsset => ({
-  src: `/images/categories/${slug}.webp`,
+  src: photoUrl(TILE_PHOTOS[slug] ?? "monstera-pot", 900),
   alt: "",
-  flag: "Placeholder image. Replace with photography.",
+  flag: "Stand-in photograph. Replace with the studio's own.",
 });
 
 export const categoriesTitle = "Plants For Everyone";

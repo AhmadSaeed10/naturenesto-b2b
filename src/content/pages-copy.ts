@@ -1,3 +1,4 @@
+import { photoImage } from "./photos";
 import { site } from "./site";
 
 export interface PageImage {
@@ -27,10 +28,10 @@ export const aboutPage = {
   title: "A plant and decor studio in Lahore",
   intro:
     "We help people live with plants and make rooms feel considered. From a single pot on a desk to a full office, we plan, supply and style it with you.",
-  image: {
-    src: "/images/hero-poster.webp",
-    alt: "A bright room styled with leafy indoor plants and ceramic pots",
-  },
+  image: photoImage(
+    "room-plants-a",
+    "A bright room styled with leafy indoor plants and ceramic pots",
+  ),
   what: {
     eyebrow: "WHAT WE DO",
     title: "Plants, pots and the thinking around them",
@@ -38,10 +39,7 @@ export const aboutPage = {
       "Nature Nesto sells plants, pots and planters, and runs a consultative styling service alongside the shop. Space planning, plant styling, custom posters and quotes, gift bundles, pot customization and corporate styling all sit under one roof.",
       "Every recommendation starts with your space: its light, its size and how you actually live in it.",
     ],
-    image: {
-      src: "/images/categories/indoor-plants.webp",
-      alt: "Indoor plants arranged on a shelf in natural light",
-    },
+    image: photoImage("pothos-shelf", "Indoor plants arranged on a shelf in natural light"),
     cta: { label: "See our services", href: "/services" },
   },
   valuesTitle: "How we like to work",
@@ -75,10 +73,7 @@ export const storyPage = {
   title: "One plant. One piece. One vibe at a time.",
   intro:
     "Nature Nesto began with a simple idea: a home feels finished when it has something alive in it.",
-  image: {
-    src: "/images/banner.webp",
-    alt: "Green foliage against a warm neutral wall",
-  },
+  image: photoImage("monstera-leaf", "Green foliage against a warm neutral wall"),
   chapters: [
     {
       eyebrow: "THE IDEA",
@@ -87,10 +82,7 @@ export const storyPage = {
         "Most people do not need a jungle. They need the right plant in the right corner, and someone to tell them how to look after it.",
         "That is how we think about every order, whether it is one pot or a whole floor.",
       ],
-      image: {
-        src: "/images/products/monstera.webp",
-        alt: "A monstera plant in a ceramic pot",
-      },
+      image: photoImage("monstera-pot", "A monstera plant in a ceramic pot"),
     },
     {
       eyebrow: "THE STUDIO",
@@ -98,10 +90,7 @@ export const storyPage = {
       paragraphs: [
         "We work from Lahore and style spaces of every size: homes, offices, cafes and shopfronts. The aim is always the same, to make a place feel calmer and more like its owner.",
       ],
-      image: {
-        src: "/images/categories/easy-care.webp",
-        alt: "Easy care plants styled together in a bright room",
-      },
+      image: photoImage("shelf", "Easy care plants styled together in a bright room"),
     },
     {
       eyebrow: "THE PROMISE",
@@ -109,10 +98,7 @@ export const storyPage = {
       paragraphs: [
         "Choosing a plant is the easy part. We stay available for care advice and offer ongoing maintenance for businesses and busy households, so what we plant keeps thriving.",
       ],
-      image: {
-        src: "/images/categories/plant-care.webp",
-        alt: "Plant care tools and soil set out on a table",
-      },
+      image: photoImage("watering-can", "Plant care tools and soil set out on a table"),
     },
   ],
   quote: site.tagline.home,
@@ -240,10 +226,7 @@ export const careersPage = {
   title: "Work with us",
   intro:
     "We are a small studio that cares about plants, design and doing things properly. If that sounds like you, we would like to hear from you.",
-  image: {
-    src: "/images/categories/large-plants.webp",
-    alt: "Tall leafy plants in a bright studio space",
-  },
+  image: photoImage("potting", "Tall leafy plants in a bright studio space"),
   whyTitle: "What it is like here",
   why: [
     {

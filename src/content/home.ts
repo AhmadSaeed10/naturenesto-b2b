@@ -1,3 +1,4 @@
+import { photoUrl } from "./photos";
 import { site } from "./site";
 import type { ContactChannel, Cta, IconItem, ValueProp } from "./types";
 
@@ -13,8 +14,8 @@ export const hero = {
   secondary: "Transform Your Space with Us",
   cta: shopNow,
   poster: {
-    src: "/images/hero-poster.webp",
-    flag: "Placeholder poster generated for the rebuild. Replace with a frame from the final hero video.",
+    src: photoUrl("room-plants-b", 1600),
+    flag: "Stand-in photograph. Replace with a frame from the final hero video.",
   },
   video: {
     src: "https://videos.pexels.com/video-files/3770017/3770017-hd_1920_1080_25fps.mp4",
@@ -51,9 +52,9 @@ export const banner = {
   secondary: "Transform Your Space with Us",
   cta: shopNow,
   image: {
-    src: "/images/banner.webp",
+    src: photoUrl("room-plants-a", 1600),
     alt: "",
-    flag: "Placeholder image. Replace with photography.",
+    flag: "Stand-in photograph. Replace with the studio's own.",
   },
 };
 
