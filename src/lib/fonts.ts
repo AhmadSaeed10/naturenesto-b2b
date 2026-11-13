@@ -1,19 +1,12 @@
-import { DM_Sans, Instrument_Serif } from "next/font/google";
+import { Baskervville } from "next/font/google";
 
-export const serif = Instrument_Serif({
-  weight: "400",
+// One typeface for every piece of text: headings, body, UI, forms. Variable weight 400 to 700,
+// but the site only uses 400 and 500 (see globals.css). Defined once here.
+export const baskervville = Baskervville({
   style: ["normal", "italic"],
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-instrument-serif",
+  variable: "--font-baskervville",
 });
 
-export const sans = DM_Sans({
-  weight: "variable",
-  axes: ["opsz"],
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-dm-sans",
-});
-
-export const fontVariables = `${serif.variable} ${sans.variable}`;
+export const fontVariables = baskervville.variable;

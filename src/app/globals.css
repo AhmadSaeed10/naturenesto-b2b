@@ -2,8 +2,19 @@
 @import "../styles/tokens.css";
 
 @theme inline {
-  --font-serif: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
-  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+  /* Both families resolve to Baskervville so old font-serif and font-sans classes agree. */
+  --font-serif: var(--font-baskervville, Georgia), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-baskervville, Georgia), Georgia, "Times New Roman", serif;
+
+  /* Tailwind's default steps are folded into the brand scale so no page drifts off it. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.4;
+  --text-sm: var(--text-small);
+  --text-sm--line-height: var(--text-small--line-height);
+  --text-base: var(--text-body);
+  --text-base--line-height: var(--text-body--line-height);
+  --text-xl: var(--text-h4);
+  --text-xl--line-height: var(--text-h4--line-height);
 }
 
 @layer base {
@@ -25,6 +36,7 @@
     background-color: var(--color-background);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-weight: 400;
     font-size: var(--text-body);
     line-height: var(--text-body--line-height);
     -webkit-font-smoothing: antialiased;
@@ -96,6 +108,15 @@
   ::selection {
     background-color: color-mix(in oklab, var(--color-primary) 28%, transparent);
     color: var(--color-ink);
+  }
+
+  /* Controls do not inherit the page font by default. */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    letter-spacing: inherit;
   }
 
   :focus-visible {
