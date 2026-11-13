@@ -20,3 +20,6 @@ Source: `src/content/pages-extra.ts`. Nothing here was supplied by the client.
 - Three testimonials (Ayesha K., Hamza R., Sana M.) are placeholders. Use real reviews with permission or remove.
 - Careers perks (learning budget, flexible hours, plant allowance) and the four hiring steps.
 - Workshop "what to expect" steps, blog topics, shipping facts and steps, policy facts, studio hours (Mon to Sat, 10 am to 7 pm). Delivery and policy wording must match the real policy.
+
+## Phase 23: typography
+Baskervville is now the only font, weights 400 and 500, scale in `src/lib/tokens.ts`. Confirm the look on the Vercel preview; the sandbox could not load Google Fonts.

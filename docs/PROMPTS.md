@@ -33,7 +33,7 @@ Scope:
 - Scaffold Next.js (App Router, TypeScript, Tailwind, ESLint, src directory, import alias @/).
 - Strict TypeScript. Add typecheck script. Configure Prettier.
 - Create src/lib/tokens.ts from CLAUDE.md and map it to the Tailwind theme.
-- Set up fonts in src/lib/fonts.ts: Instrument Serif (regular and italic) and the body font.
+- Set up fonts in src/lib/fonts.ts: Baskervville (regular and italic), used for all text (changed from Instrument Serif and DM Sans in phase 23).
 - Global styles: base typography scale with clamp(), focus-visible styles, selection color, SVG noise grain utility, reduced motion defaults.
 - Create folder structure from CLAUDE.md and the content data files as typed stubs.
 - Set up .gitignore, .env.example, README with scripts.
