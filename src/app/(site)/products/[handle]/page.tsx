@@ -10,6 +10,7 @@ import { ProductGallery } from "@/components/shop/ProductGallery";
 import { ProductReviews, REVIEWS_ID } from "@/components/shop/ProductReviews";
 import { RecommendedAdds } from "@/components/shop/RecommendedAdds";
 import { Stars } from "@/components/shop/Stars";
+import { WishlistButton } from "@/components/shop/WishlistButton";
 import { ProductPurchase } from "@/components/shop/ProductPurchase";
 import { Button } from "@/components/ui/Button";
 import { FrameCorners } from "@/components/ui/FrameCorners";
@@ -249,7 +250,14 @@ export default async function ProductPage({ params }: PageProps<"/products/[hand
 
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-4">
-                <h1 className="text-h3">{product.title}</h1>
+                <div className="flex items-start justify-between gap-4">
+                  <h1 className="text-h3">{product.title}</h1>
+                  <WishlistButton
+                    handle={product.handle}
+                    name={product.title}
+                    className="shrink-0"
+                  />
+                </div>
                 <a
                   href={`#${REVIEWS_ID}`}
                   className="inline-flex w-fit items-center gap-2 text-small text-ink-muted hover:text-ink"

@@ -8,6 +8,7 @@ import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { QuickAdd } from "./QuickAdd";
 import { Stars } from "./Stars";
+import { WishlistButton } from "./WishlistButton";
 
 interface ProductCardProps {
   product: Product;
@@ -98,6 +99,12 @@ export function ProductCard({ product, whatsappHref, priority = false }: Product
             ) : null}
           </div>
         </div>
+        {/* Outside the masked photo so it sits above the stretched card link. */}
+        <WishlistButton
+          handle={product.href?.split("/").pop() ?? product.id}
+          name={product.name}
+          className="absolute top-2 right-2 z-10"
+        />
         <FrameCorners className="-m-2 text-ink opacity-0 transition-opacity duration-(--duration-micro) ease-brand group-focus-within:opacity-100 group-hover:opacity-100" />
       </div>
 
