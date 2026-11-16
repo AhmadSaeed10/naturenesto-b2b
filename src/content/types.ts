@@ -17,6 +17,26 @@ export interface SocialLink extends NavLink {
 
 export type Cta = NavLink;
 
+/** One link inside a dropdown. Without an href it renders as a Coming Soon label. */
+export interface NavItem {
+  label: string;
+  href?: string;
+  soon?: boolean;
+}
+
+export interface NavColumn {
+  heading: string;
+  items: NavItem[];
+}
+
+/** A top level nav entry. Groups with columns open a dropdown, the rest are plain links. */
+export interface NavGroup {
+  label: string;
+  href: string;
+  columns?: NavColumn[];
+  flag?: string;
+}
+
 export interface FooterColumn {
   heading: string;
   links: NavLink[];

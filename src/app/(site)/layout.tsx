@@ -23,7 +23,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           focusTargetId={HEADER_HOME_LINK_ID}
         />
       ) : null}
-      <Header nav={chrome.headerNav} cta={chrome.headerCta} socials={chrome.socials} />
+      <Header cta={chrome.headerCta} socials={chrome.socials} />
       <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
         {children}
       </main>

@@ -27,7 +27,10 @@ export type UiIconName =
   | "chevron-right"
   | "truck"
   | "expand"
-  | "check";
+  | "check"
+  | "search"
+  | "heart"
+  | "user";
 
 const PATHS: Record<UiIconName, ReactNode> = {
   "arrow-right": <path d="M4 12h15M13 6l6 6-6 6" />,
@@ -113,6 +116,21 @@ const PATHS: Record<UiIconName, ReactNode> = {
     <>
       <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
       <path d="M8 10.5V16M8 7.75v.01M11.75 16v-5.5M11.75 13a2.5 2.5 0 0 1 5 0v3" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </>
+  ),
+  heart: (
+    <path d="M12 20s-7.5-4.6-7.5-10A4.5 4.5 0 0 1 12 7.2 4.5 4.5 0 0 1 19.5 10C19.5 15.4 12 20 12 20Z" />
+  ),
+  user: (
+    <>
+      <circle cx="12" cy="8.5" r="3.5" />
+      <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" />
     </>
   ),
   twitter: <path d="M4.5 4.5h3.75l11.25 15h-3.75L4.5 4.5ZM19.5 4.5l-6.25 7M4.5 19.5l6.25-7" />,

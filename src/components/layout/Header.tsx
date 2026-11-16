@@ -1,29 +1,27 @@
 import Link from "next/link";
-import { headerCta as defaultCta, headerNav as defaultNav } from "@/content/nav";
+import { headerCta as defaultCta, headerGroups } from "@/content/nav";
 import { site } from "@/content/site";
-import type { Cta, NavLink as NavLinkData, SocialLink } from "@/content/types";
+import type { Cta, SocialLink } from "@/content/types";
 import { ui } from "@/content/ui";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
-import { NavLink } from "@/components/ui/NavLink";
+import { Icon } from "@/components/ui/Icon";
 import { HeaderScroll } from "./HeaderScroll";
 import { CartIndicator } from "@/components/shop/CartIndicator";
+import { HeaderSearch } from "./HeaderSearch";
 import { MobileMenu } from "./MobileMenu";
+import { NavMenu } from "./NavMenu";
+import { WishlistLink } from "./WishlistLink";
 
 export const HEADER_ID = "site-header";
 export const HEADER_HOME_LINK_ID = "site-header-home";
 
 interface HeaderProps {
-  nav?: NavLinkData[];
   cta?: Cta;
   socials?: SocialLink[];
 }
 
-export function Header({
-  nav: headerNav = defaultNav,
-  cta: headerCta = defaultCta,
-  socials = [...site.socials],
-}: HeaderProps) {
+export function Header({ cta: headerCta = defaultCta, socials = [...site.socials] }: HeaderProps) {
   return (
     <header
       id={HEADER_ID}
@@ -45,13 +43,7 @@ export function Header({
         </Link>
 
         <nav aria-label={ui.primaryNav} className="hidden xl:block">
-          <ul className="flex items-center gap-7">
-            {headerNav.map((link) => (
-              <li key={link.href}>
-                <NavLink href={link.href}>{link.label}</NavLink>
-              </li>
-            ))}
-          </ul>
+          <NavMenu groups={headerGroups} />
         </nav>
 
         <div className="flex items-center gap-2">
@@ -61,8 +53,17 @@ export function Header({
               {headerCta.label}
             </Button>
           </div>
+          <HeaderSearch />
+          <Link
+            href="/account"
+            aria-label={ui.header.account}
+            className="hidden size-(--size-tap) items-center justify-center rounded-pill text-ink transition-colors duration-(--duration-micro) hover:bg-surface sm:inline-flex"
+          >
+            <Icon name="user" size={22} />
+          </Link>
+          <WishlistLink />
           <CartIndicator />
-          <MobileMenu links={headerNav} cta={headerCta} socials={socials} />
+          <MobileMenu groups={headerGroups} cta={headerCta} socials={socials} />
         </div>
       </div>
     </header>
