@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { FrameCorners } from "@/components/ui/FrameCorners";
 import { Icon } from "@/components/ui/Icon";
 import { TornEdge } from "@/components/ui/TornEdge";
+import { homeHero } from "@/content/home-world";
 import { ui } from "@/content/ui";
 import { HeroVideo } from "./HeroVideo";
 import { type SectionData, sectionFallbacks } from "@/lib/cms/sections";
@@ -49,16 +50,21 @@ export function Hero({ data: hero = sectionFallbacks.hero }: HeroProps) {
             as="h1"
             id={HERO_TITLE_ID}
             text={hero.headline}
-            emphasis={["Life"]}
+            emphasis={["Nature"]}
             className="text-display"
           />
           <Reveal delay={0.3} className="mt-6 flex flex-col items-start gap-8">
             <p className="max-w-md text-lead text-surface">{hero.secondary}</p>
-            <Magnetic>
-              <Button href={hero.cta.href} withArrow>
-                {hero.cta.label}
+            <div className="flex flex-wrap gap-3">
+              <Magnetic>
+                <Button href={hero.cta.href} withArrow>
+                  {hero.cta.label}
+                </Button>
+              </Magnetic>
+              <Button href={homeHero.second.href} variant="secondary">
+                {homeHero.second.label}
               </Button>
-            </Magnetic>
+            </div>
           </Reveal>
         </div>
       </div>

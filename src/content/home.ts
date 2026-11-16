@@ -1,3 +1,4 @@
+import { homeHero } from "./home-world";
 import { photoUrl } from "./photos";
 import { site } from "./site";
 import type { ContactChannel, Cta, IconItem, ValueProp } from "./types";
@@ -9,10 +10,10 @@ const shopNow: Cta = {
 };
 
 export const hero = {
-  headline: "Bring Life to Your Space",
-  subline: "Welcome to Nature Nesto",
-  secondary: "Transform Your Space with Us",
-  cta: shopNow,
+  headline: homeHero.headline,
+  subline: homeHero.subline,
+  secondary: homeHero.secondary,
+  cta: homeHero.primary,
   poster: {
     src: photoUrl("room-plants-b", 1600),
     flag: "Stand-in photograph. Replace with a frame from the final hero video.",
