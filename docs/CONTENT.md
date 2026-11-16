@@ -23,3 +23,12 @@ Source: `src/content/pages-extra.ts`. Nothing here was supplied by the client.
 
 ## Phase 23: typography
 Baskervville is now the only font, weights 400 and 500, scale in `src/lib/tokens.ts`. Confirm the look on the Vercel preview; the sandbox could not load Google Fonts.
+
+## Phase 24: marketplace structure (all inferred, client to confirm)
+Drafted from the strategy chat "Where Nature Meets Living". Nothing here was supplied by the client.
+- Homepage sections after the hero (`src/content/home-world.ts`): intro, Explore Our World, solutions, marketplace band, Shop by Space, featured projects, Why Nature Nesto, final CTA. Code driven, not editable in admin.
+- Solutions (`src/content/solutions.ts`), Shop by Space product lists (`src/content/spaces.ts`), marketplace copy (`src/content/marketplace.ts`).
+- Projects (`src/content/projects.ts`): six placeholder projects with stand-in photos. No real project data exists.
+- Water & Aquatic Living and Birds & Nature are Coming Soon only (live animals need separate logistics and regulations).
+- The header menu is now code driven (`headerGroups` in `src/content/nav.ts`); the admin header menu no longer controls it.
+- The seed never overwrites existing rows. After deploying, run `npm run db:refresh-home` once to apply the new hero and home SEO (it replaces hero edits made in admin).
