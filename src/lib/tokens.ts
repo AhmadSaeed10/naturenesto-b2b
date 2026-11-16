@@ -33,8 +33,8 @@ export const TOKENS = {
     h3: { size: "clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem)", leading: "1.12", tracking: "-0.005em" },
     h4: { size: "clamp(1.25rem, 1.1rem + 0.6vw, 1.625rem)", leading: "1.2", tracking: "0em" },
     lead: { size: "clamp(1.125rem, 1.05rem + 0.35vw, 1.375rem)", leading: "1.5", tracking: "0em" },
-    body: { size: "1.0625rem", leading: "1.6", tracking: "0em" },
-    small: { size: "0.9375rem", leading: "1.5", tracking: "0em" },
+    body: { size: "1rem", leading: "1.6", tracking: "0em" },
+    small: { size: "0.875rem", leading: "1.5", tracking: "0em" },
     eyebrow: { size: "0.75rem", leading: "1.2", tracking: "0.18em" },
   },
   motion: {

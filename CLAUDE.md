@@ -77,9 +77,9 @@ Rules:
 - Never hardcode hex values outside tokens.ts.
 
 ## Typography
-- One typeface everywhere: Baskervville (regular and italic) via next/font/google, defined once in `src/lib/fonts.ts`. Headings, body, UI, forms and buttons all use it. `font-serif` and `font-sans` both resolve to it.
+- Two typefaces, set once in `src/lib/fonts.ts` via next/font/google: Baskervville (regular and italic) for headings, pull quotes and italic emphasis; Inter for body, UI, nav, buttons and forms. `font-serif` is Baskervville, `font-sans` is Inter.
 - Weights: 400 for body and headings, 500 for labels, buttons, nav, prices and eyebrows. Nothing heavier.
-- Sizes only from the token scale in `src/lib/tokens.ts` (display, h1 to h4, lead, body 17px, small 15px, eyebrow). Tailwind's `text-xs/sm/base/xl` are mapped onto it, no arbitrary sizes.
+- Sizes only from the token scale in `src/lib/tokens.ts` (display, h1 to h4, lead, body 16px, small 14px, eyebrow). Tailwind's `text-xs/sm/base/xl` are mapped onto it, no arbitrary sizes.
 - Italic for emphasis words inside headlines. Eyebrow labels: small uppercase, wide tracking, to echo the logo wordmark.
 - Heading order: one h1 per page, then h2, h3 with no skipped levels. Style comes from `text-h*` classes, not from the tag.
 

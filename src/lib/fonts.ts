@@ -1,7 +1,7 @@
-import { Baskervville } from "next/font/google";
+import { Baskervville, Inter } from "next/font/google";
 
-// One typeface for every piece of text: headings, body, UI, forms. Variable weight 400 to 700,
-// but the site only uses 400 and 500 (see globals.css). Defined once here.
+// Two families, one job each: Baskervville for headings and italic accents, Inter for body,
+// UI and forms. Defined once here. The site only uses weights 400 and 500 (see globals.css).
 export const baskervville = Baskervville({
   style: ["normal", "italic"],
   subsets: ["latin"],
@@ -9,4 +9,10 @@ export const baskervville = Baskervville({
   variable: "--font-baskervville",
 });
 
-export const fontVariables = baskervville.variable;
+export const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
+
+export const fontVariables = `${baskervville.variable} ${inter.variable}`;

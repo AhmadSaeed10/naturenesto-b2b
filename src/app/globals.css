@@ -2,9 +2,9 @@
 @import "../styles/tokens.css";
 
 @theme inline {
-  /* Both families resolve to Baskervville so old font-serif and font-sans classes agree. */
+  /* Headings and italic accents use the serif, everything else the sans. */
   --font-serif: var(--font-baskervville, Georgia), Georgia, "Times New Roman", serif;
-  --font-sans: var(--font-baskervville, Georgia), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter, system-ui), system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* Tailwind's default steps are folded into the brand scale so no page drifts off it. */
   --text-xs: 0.8125rem;
@@ -63,7 +63,9 @@
   h1,
   h2,
   h3,
-  h4 {
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-serif);
     font-weight: 400;
     text-wrap: balance;
